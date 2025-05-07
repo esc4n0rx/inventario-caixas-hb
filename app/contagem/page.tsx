@@ -24,6 +24,8 @@ import {
 import { useToast } from "@/components/ui/use-toast"
 import { useStore } from "@/lib/store"
 import { ativos } from "@/data/ativos"
+import { lojas } from "@/data/lojas"
+import { supabase } from '@/lib/supabase'
 
 const formSchema = z.object({
   quantidade: z.coerce.number().min(0, "A quantidade não pode ser negativa"),
@@ -35,7 +37,7 @@ export default function Contagem() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const router = useRouter()
   const { toast } = useToast()
-  const { userData, contagem, setContagem, resetContagem } = useStore()
+  const { userData, contagem, setContagem, resetContagem, isBlocked, checkSystemStatus } = useStore()
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -45,15 +47,29 @@ export default function Contagem() {
   })
 
   useEffect(() => {
+    // Verificar status do sistema
+    checkSystemStatus();
+    
     // Redirect if no user data
     if (!userData.loja || !userData.email) {
       router.push("/")
       return
     }
 
+    // Redirecionar se o sistema estiver bloqueado
+    if (isBlocked) {
+      toast({
+        title: "Sistema bloqueado",
+        description: "O sistema está temporariamente bloqueado para contagens",
+        variant: "destructive",
+      });
+      router.push("/");
+      return;
+    }
+
     // Update form when step changes
     form.setValue("quantidade", contagem[ativos[currentStep].id] || 0)
-  }, [currentStep, userData, router, form, contagem])
+  }, [currentStep, userData, router, form, contagem, isBlocked, checkSystemStatus, toast])
 
   const onSubmit = (values: z.infer<typeof formSchema>) => {
     // Save current count
@@ -68,22 +84,78 @@ export default function Contagem() {
     }
   }
 
-  const handleSubmitFinal = () => {
-    setIsSubmitting(true)
+  const handleSubmitFinal = async () => {
+    setIsSubmitting(true);
 
-    // Simulate API request
-    setTimeout(() => {
-      setIsSubmitting(false)
-      setShowReview(false)
+    try {
+      // Verificar se o sistema está bloqueado
+      const { data: configData, error: configError } = await supabase
+        .from('configuracao_sistema')
+        .select('valor')
+        .eq('chave', 'sistema_bloqueado')
+        .single();
+      
+      if (configError) throw configError;
+      
+      if (configData.valor === 'true') {
+        toast({
+          title: "Sistema bloqueado",
+          description: "O sistema está temporariamente bloqueado para contagens",
+          variant: "destructive",
+        });
+        setIsSubmitting(false);
+        router.push("/");
+        return;
+      }
+      
+      // Encontrar nome da loja
+      const loja = lojas.find(l => l.id === userData.loja);
+      if (!loja) {
+        toast({
+          title: "Erro",
+          description: "Loja não encontrada",
+          variant: "destructive",
+        });
+        setIsSubmitting(false);
+        return;
+      }
+      
+      // Preparar registros para inserção em batch
+      const registros = ativos.map(ativo => ({
+        email: userData.email,
+        loja: userData.loja,
+        loja_nome: loja.nome,
+        ativo: ativo.id,
+        ativo_nome: ativo.nome,
+        quantidade: contagem[ativo.id] || 0
+      }));
+      
+      // Inserir todos os registros de uma vez
+      const { error } = await supabase
+        .from('contagens')
+        .insert(registros);
+      
+      if (error) throw error;
+      
+      setShowReview(false);
       toast({
         title: "Contagem enviada com sucesso!",
         description: "Obrigado por completar o inventário.",
         variant: "default",
-      })
-      resetContagem()
-      router.push("/")
-    }, 2000)
-  }
+      });
+      resetContagem();
+      router.push("/");
+    } catch (error) {
+      console.error('Erro ao enviar contagem:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível registrar a contagem. Tente novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const updateReviewItem = (id: string, value: number) => {
     setContagem(id, value)

@@ -1,12 +1,12 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
 import { z } from "zod"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { Leaf } from "lucide-react"
+import { Leaf, AlertTriangle } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -39,9 +39,21 @@ const formSchema = z.object({
 
 export default function Home() {
   const [showConfirmation, setShowConfirmation] = useState(false)
+  const [loading, setLoading] = useState(true)
   const router = useRouter()
   const { toast } = useToast()
-  const { setUserData, isBlocked } = useStore()
+  const { setUserData, isBlocked, checkSystemStatus } = useStore()
+
+  // Verificar status do sistema ao carregar a página
+  useEffect(() => {
+    const loadSystemStatus = async () => {
+      setLoading(true);
+      await checkSystemStatus();
+      setLoading(false);
+    };
+    
+    loadSystemStatus();
+  }, [checkSystemStatus]);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -52,6 +64,16 @@ export default function Home() {
   })
 
   const onSubmit = (values: z.infer<typeof formSchema>) => {
+    // Verificar novamente se o sistema está bloqueado antes de prosseguir
+    if (isBlocked) {
+      toast({
+        title: "Sistema bloqueado",
+        description: "O sistema está temporariamente bloqueado para contagens",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     setUserData({
       loja: values.loja,
       email: values.email,
@@ -61,6 +83,17 @@ export default function Home() {
   }
 
   const handleConfirm = () => {
+    // Verificar novamente se o sistema está bloqueado antes de redirecionar
+    if (isBlocked) {
+      toast({
+        title: "Sistema bloqueado",
+        description: "O sistema está temporariamente bloqueado para contagens",
+        variant: "destructive",
+      });
+      setShowConfirmation(false);
+      return;
+    }
+    
     setShowConfirmation(false)
     router.push("/contagem")
   }
@@ -96,9 +129,15 @@ export default function Home() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {isBlocked ? (
+            {loading ? (
+              <div className="text-center p-4">
+                <p className="text-white">Carregando...</p>
+              </div>
+            ) : isBlocked ? (
               <div className="text-center p-4 bg-red-900/30 rounded-md">
+                <AlertTriangle className="h-8 w-8 mx-auto mb-2 text-red-400" />
                 <p className="text-white font-medium">Contagem temporariamente desativada.</p>
+                <p className="text-zinc-400 mt-2 text-sm">O sistema está em manutenção. Por favor, tente novamente mais tarde.</p>
               </div>
             ) : (
               <Form {...form}>
@@ -115,7 +154,7 @@ export default function Home() {
                               <SelectValue placeholder="Selecione uma loja" />
                             </SelectTrigger>
                           </FormControl>
-                          <SelectContent className="bg-zinc-800 border-zinc-700">
+                          <SelectContent position="item-aligned" sideOffset={4} className="bg-zinc-800 border-zinc-700">
                             {lojas.map((loja) => (
                               <SelectItem key={loja.id} value={loja.id}>
                                 {loja.nome}
@@ -147,7 +186,6 @@ export default function Home() {
                   <Button
                     type="submit"
                     className="w-full bg-[#F4C95D] hover:bg-[#e5bb4e] text-black"
-                    disabled={isBlocked}
                   >
                     Iniciar Contagem
                   </Button>
