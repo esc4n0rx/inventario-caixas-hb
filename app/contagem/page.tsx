@@ -1,3 +1,4 @@
+// app/contagem/page.tsx (versão final)
 "use client"
 
 import { useState, useEffect } from "react"
@@ -26,6 +27,8 @@ import { useStore } from "@/lib/store"
 import { ativos } from "@/data/ativos"
 import { lojas } from "@/data/lojas"
 import { supabase } from '@/lib/supabase'
+import { SelectCdCountType } from "@/components/SelectCdCountType"
+import { TransitoCountForm } from "@/components/TransitoCountForm"
 
 const formSchema = z.object({
   quantidade: z.coerce.number().min(0, "A quantidade não pode ser negativa"),
@@ -35,16 +38,32 @@ export default function Contagem() {
   const [currentStep, setCurrentStep] = useState(0)
   const [showReview, setShowReview] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [showCdTypeModal, setShowCdTypeModal] = useState(false)
+  const [showTransitoCount, setShowTransitoCount] = useState(false)
   const router = useRouter()
   const { toast } = useToast()
-  const { userData, contagem, setContagem, resetContagem, isBlocked, checkSystemStatus ,checkLojaStatus} = useStore()
+  const { 
+    userData, 
+    contagem, 
+    setContagem, 
+    resetContagem, 
+    isBlocked, 
+    checkSystemStatus, 
+    checkLojaStatus,
+    countType,
+    setCountType,
+    transitoCompleted,
+    setTransitoCompleted
+  } = useStore()
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      quantidade: contagem[ativos[currentStep].id] || 0,
+      quantidade: contagem[ativos[currentStep]?.id] || 0,
     },
   })
+
+  const isCdLocation = userData?.loja === "92" || userData?.loja === "93" // CD SP ou CD ES
 
   useEffect(() => {
     // Verificar status do sistema
@@ -81,9 +100,16 @@ export default function Contagem() {
     };
     verificarLoja();
 
+    // Mostrar modal de seleção para CD
+    if (isCdLocation && !countType && !transitoCompleted) {
+      setShowCdTypeModal(true);
+    }
+
     // Update form when step changes
-    form.setValue("quantidade", contagem[ativos[currentStep].id] || 0)
-  }, [currentStep, userData, router, form, contagem, isBlocked, checkSystemStatus, toast])
+    if (ativos[currentStep]) {
+      form.setValue("quantidade", contagem[ativos[currentStep].id] || 0);
+    }
+  }, [currentStep, userData, router, form, contagem, isBlocked, checkSystemStatus, toast, countType, isCdLocation, transitoCompleted])
 
   const onSubmit = (values: z.infer<typeof formSchema>) => {
     // Save current count
@@ -169,6 +195,14 @@ export default function Contagem() {
       if (error) throw error;
       
       setShowReview(false);
+
+      // Se for um CD e não tiver feito contagem de trânsito ainda, mostrar formulário de trânsito
+      if (isCdLocation && countType === "estoque" && !transitoCompleted) {
+        setShowTransitoCount(true);
+        setIsSubmitting(false);
+        return;
+      }
+
       toast({
         title: "Contagem enviada com sucesso!",
         description: "Obrigado por completar o inventário.",
@@ -189,7 +223,42 @@ export default function Contagem() {
   };
 
   const updateReviewItem = (id: string, value: number) => {
-    setContagem(id, value)
+    setContagem(id, value);
+  }
+
+  const handleCdTypeSelection = (type: "estoque" | "transito") => {
+    setCountType(type);
+    setShowCdTypeModal(false);
+
+    if (type === "transito") {
+      setShowTransitoCount(true);
+    }
+  };
+
+  const handleTransitoComplete = () => {
+    setShowTransitoCount(false);
+    setTransitoCompleted(true);
+  };
+
+  // Se estiver mostrando formulário de trânsito
+  if (showTransitoCount) {
+    return (
+      <div className="relative min-h-screen w-full flex items-center justify-center p-4">
+        <div
+          className="absolute inset-0 bg-cover bg-center z-0"
+          style={{
+            backgroundImage: "url('/fundo-login.png')",
+            opacity: 0.2,
+          }}
+        />
+        <div className="z-10 w-full max-w-lg">
+          <TransitoCountForm 
+            onComplete={handleTransitoComplete} 
+            onSkip={handleTransitoComplete}
+          />
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -214,7 +283,13 @@ export default function Contagem() {
           <Card className="bg-[#2C2C2C] text-white border-none shadow-xl">
             <CardHeader>
               <CardTitle className="text-xl font-bold">
-                Bem-vindo! Por favor, preencha as informações da loja:
+                {isCdLocation && (
+                  <div className="mb-2 text-[#F4C95D] text-sm font-medium">
+                    {countType === "estoque" ? "Contagem de Estoque do CD" : ""}
+                    {transitoCompleted && countType === "transito" ? "Contagem de Estoque do CD" : ""}
+                  </div>
+                )}
+                Contagem de Caixas
               </CardTitle>
               <CardDescription className="text-zinc-400">
                 {userData.lojaName} - {userData.email}
@@ -224,19 +299,21 @@ export default function Contagem() {
               <div className="space-y-4">
                 <div className="text-center mb-4">
                   <h3 className="text-lg font-medium">
-                    Quantas caixas de {ativos[currentStep].nome} você possui na sua loja?
+                    Quantas caixas de {ativos[currentStep]?.nome} você possui na sua loja?
                   </h3>
                 </div>
 
                 <div className="flex justify-center mb-4">
                   <div className="relative h-40 w-40 bg-zinc-800 rounded-lg flex items-center justify-center overflow-hidden">
-                    <Image
-                      src={`/${ativos[currentStep].imagem}`}
-                      alt={ativos[currentStep].nome}
-                      width={160}
-                      height={160}
-                      className="object-contain"
-                    />
+                    {ativos[currentStep] && (
+                      <Image
+                        src={`/${ativos[currentStep].imagem}`}
+                        alt={ativos[currentStep].nome}
+                        width={160}
+                        height={160}
+                        className="object-contain"
+                      />
+                    )}
                   </div>
                 </div>
 
@@ -280,6 +357,7 @@ export default function Contagem() {
         </motion.div>
       </AnimatePresence>
 
+      {/* Modal de revisão de contagem */}
       <Dialog open={showReview} onOpenChange={setShowReview}>
         <DialogContent className="bg-zinc-900 text-white border-zinc-800 max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -337,6 +415,13 @@ export default function Contagem() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Modal de seleção de tipo para CD */}
+      <SelectCdCountType
+        open={showCdTypeModal}
+        onOpenChange={setShowCdTypeModal}
+        onSelectType={handleCdTypeSelection}
+      />
     </div>
   )
 }

@@ -1,4 +1,4 @@
-// lib/store.ts - modificação
+// lib/store.ts (versão completa)
 import { create } from "zustand"
 import { persist } from "zustand/middleware"
 import { supabase } from './supabase'
@@ -16,13 +16,20 @@ type Contagem = {
 type Store = {
   userData: UserData
   contagem: Contagem
+  contagemTransito: Contagem
   isBlocked: boolean
   isLojaBlocked: boolean
+  transitoCompleted: boolean
+  countType: "estoque" | "transito" | null
   setUserData: (data: UserData) => void
   setContagem: (id: string, quantidade: number) => void
+  setContagemTransito: (id: string, quantidade: number) => void
   resetContagem: () => void
+  resetContagemTransito: () => void
   setIsBlocked: (blocked: boolean) => void
   setIsLojaBlocked: (blocked: boolean) => void
+  setTransitoCompleted: (completed: boolean) => void
+  setCountType: (type: "estoque" | "transito" | null) => void
   checkSystemStatus: () => Promise<void>
   checkLojaStatus: (lojaId: string) => Promise<boolean>
 }
@@ -36,16 +43,36 @@ export const useStore = create<Store>()(
         email: "",
       },
       contagem: {},
+      contagemTransito: {},
       isBlocked: false,
       isLojaBlocked: false,
+      transitoCompleted: false,
+      countType: null,
+      
       setUserData: (data) => set({ userData: data }),
+      
       setContagem: (id, quantidade) =>
         set((state) => ({
           contagem: { ...state.contagem, [id]: quantidade },
         })),
+        
+      setContagemTransito: (id, quantidade) =>
+        set((state) => ({
+          contagemTransito: { ...state.contagemTransito, [id]: quantidade },
+        })),
+        
       resetContagem: () => set({ contagem: {} }),
+      
+      resetContagemTransito: () => set({ contagemTransito: {} }),
+      
       setIsBlocked: (blocked) => set({ isBlocked: blocked }),
+      
       setIsLojaBlocked: (blocked) => set({ isLojaBlocked: blocked }),
+      
+      setTransitoCompleted: (completed) => set({ transitoCompleted: completed }),
+      
+      setCountType: (type) => set({ countType: type }),
+      
       checkSystemStatus: async () => {
         try {
           const { data, error } = await supabase
@@ -61,6 +88,7 @@ export const useStore = create<Store>()(
           console.error('Erro ao verificar status do sistema:', error);
         }
       },
+      
       checkLojaStatus: async (lojaId: string) => {
         try {
           if (!lojaId) return false;
