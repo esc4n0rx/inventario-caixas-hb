@@ -37,7 +37,7 @@ export default function Contagem() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const router = useRouter()
   const { toast } = useToast()
-  const { userData, contagem, setContagem, resetContagem, isBlocked, checkSystemStatus } = useStore()
+  const { userData, contagem, setContagem, resetContagem, isBlocked, checkSystemStatus ,checkLojaStatus} = useStore()
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -66,6 +66,20 @@ export default function Contagem() {
       router.push("/");
       return;
     }
+
+    const verificarLoja = async () => {
+      const lojaJaContou = await checkLojaStatus(userData.loja);
+      if (lojaJaContou) {
+        toast({
+          title: "Loja já realizou contagem",
+          description: "Esta loja já enviou uma contagem e não pode enviar novamente",
+          variant: "destructive",
+        });
+        router.push("/");
+        return;
+      }
+    };
+    verificarLoja();
 
     // Update form when step changes
     form.setValue("quantidade", contagem[ativos[currentStep].id] || 0)
@@ -107,8 +121,25 @@ export default function Contagem() {
         router.push("/");
         return;
       }
+
+      // Verificar se a loja já fez contagem
+        const { data: contagemData, count } = await supabase
+        .from('contagens')
+        .select('id', { count: 'exact' })
+        .eq('loja', userData.loja)
+        .limit(1);
       
-      // Encontrar nome da loja
+      if (count !== null && count > 0) {
+        toast({
+          title: "Loja já realizou contagem",
+          description: "Esta loja já enviou uma contagem e não pode enviar novamente",
+          variant: "destructive",
+        });
+        setIsSubmitting(false);
+        router.push("/");
+        return;
+      }
+      
       const loja = lojas.find(l => l.id === userData.loja);
       if (!loja) {
         toast({

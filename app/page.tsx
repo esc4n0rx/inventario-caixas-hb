@@ -42,7 +42,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true)
   const router = useRouter()
   const { toast } = useToast()
-  const { setUserData, isBlocked, checkSystemStatus } = useStore()
+  const { setUserData, isBlocked, checkSystemStatus,checkLojaStatus } = useStore()
 
   // Verificar status do sistema ao carregar a página
   useEffect(() => {
@@ -63,12 +63,22 @@ export default function Home() {
     },
   })
 
-  const onSubmit = (values: z.infer<typeof formSchema>) => {
+  const onSubmit = async (values: z.infer<typeof formSchema>) => {
     // Verificar novamente se o sistema está bloqueado antes de prosseguir
     if (isBlocked) {
       toast({
         title: "Sistema bloqueado",
         description: "O sistema está temporariamente bloqueado para contagens",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const lojaJaContou = await checkLojaStatus(values.loja);
+    if (lojaJaContou) {
+      toast({
+        title: "Loja já realizou contagem",
+        description: "Esta loja já enviou uma contagem e não pode enviar novamente",
         variant: "destructive",
       });
       return;
@@ -82,12 +92,24 @@ export default function Home() {
     setShowConfirmation(true)
   }
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     // Verificar novamente se o sistema está bloqueado antes de redirecionar
     if (isBlocked) {
       toast({
         title: "Sistema bloqueado",
         description: "O sistema está temporariamente bloqueado para contagens",
+        variant: "destructive",
+      });
+      setShowConfirmation(false);
+      return;
+    }
+
+    // Verificar se a loja já fez contagem (novamente, como medida de segurança)
+    const lojaJaContou = await checkLojaStatus(form.getValues().loja);
+    if (lojaJaContou) {
+      toast({
+        title: "Loja já realizou contagem",
+        description: "Esta loja já enviou uma contagem e não pode enviar novamente",
         variant: "destructive",
       });
       setShowConfirmation(false);
