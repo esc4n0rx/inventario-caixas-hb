@@ -99,6 +99,7 @@ export interface SystemConfig {
 }
 
 type ScheduleForm = {
+  modo: 'automatico' | 'manual';
   dataInicio: string;
   horaInicio: string;
   dataFim: string;
@@ -132,24 +133,27 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [activeTab, setActiveTab] = useState<'overview' | 'configurations' | 'management'>('overview');
   const [showScheduleDialog, setShowScheduleDialog] = useState<boolean>(false);
   const [scheduleForm, setScheduleForm] = useState<ScheduleForm>({
-    dataInicio: systemConfig?.dataInicio ?? '',
-    horaInicio: systemConfig?.horaInicio ?? '',
-    dataFim: systemConfig?.dataFim ?? '',
-    horaFim: systemConfig?.horaFim ?? '',
+    modo: systemConfig?.modo || 'manual',
+    dataInicio: systemConfig?.dataInicio || '',
+    horaInicio: systemConfig?.horaInicio || '',
+    dataFim: systemConfig?.dataFim || '',
+    horaFim: systemConfig?.horaFim || '',
   });
   const [editingContagem, setEditingContagem] = useState<Contagem | null>(null);
   const [showEditDialog, setShowEditDialog] = useState<boolean>(false);
   const [editForm, setEditForm] = useState<{ quantidade: number }>({ quantidade: 0 });
 
   useEffect(() => {
-    setScheduleForm({
-      dataInicio: systemConfig?.dataInicio ?? '',
-      horaInicio:  systemConfig?.horaInicio  ?? '',
-      dataFim:     systemConfig?.dataFim     ?? '',
-      horaFim:     systemConfig?.horaFim     ?? '',
-    });
+    if (systemConfig) {
+      setScheduleForm({
+        modo: systemConfig.modo || 'manual',
+        dataInicio: systemConfig.dataInicio || '',
+        horaInicio: systemConfig.horaInicio || '',
+        dataFim: systemConfig.dataFim || '',
+        horaFim: systemConfig.horaFim || '',
+      });
+    }
   }, [systemConfig]);
-  
 
   // Estatísticas
   const totalLojas = lojas.length;
@@ -173,14 +177,35 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     if (editingContagem) {
       await onEditContagem(editingContagem.id, editForm.quantidade);
       setShowEditDialog(false);
-      handleRefresh();
     }
   };
 
   const handleSaveSchedule = async (): Promise<void> => {
-    await onUpdateSchedule(scheduleForm);
+    await onUpdateSchedule({
+      modo: scheduleForm.modo,
+      dataInicio: scheduleForm.dataInicio,
+      horaInicio: scheduleForm.horaInicio,
+      dataFim: scheduleForm.dataFim,
+      horaFim: scheduleForm.horaFim
+    });
     setShowScheduleDialog(false);
-    handleRefresh();
+  };
+
+  // Função para lidar com a mudança de modo (manual/automático)
+  const handleModeChange = (value: boolean) => {
+    const newMode = value ? 'automatico' : 'manual';
+    setScheduleForm({
+      ...scheduleForm,
+      modo: newMode
+    });
+    
+    // Se mudar para modo automático e não tiver configuração de horário, abrir o diálogo
+    if (value && (!systemConfig?.dataInicio || !systemConfig?.horaInicio)) {
+      setShowScheduleDialog(true);
+    } else {
+      // Caso contrário, atualizar a configuração diretamente
+      onUpdateSchedule({ modo: newMode });
+    }
   };
 
   const calcularMediaPorHora = (): string => {
@@ -242,11 +267,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     if (!systemConfig || !systemConfig.dataInicio || !systemConfig.dataFim) return false;
     const now = new Date();
     const inicio = new Date(`${systemConfig.dataInicio}T${systemConfig.horaInicio}`);
-    const fim = new Date(`${systemConfig.dataFim}T{systemConfig.horaFim}`);
+    const fim = new Date(`${systemConfig.dataFim}T${systemConfig.horaFim}`);
     return now >= inicio && now <= fim;
   };
 
   const dentroDoHorario = verificarHorarioProgramado();
+
+  // Formatar data para exibição no formato brasileiro
+  const formatarDataBR = (dataISO: string): string => {
+    if (!dataISO) return '';
+    const [ano, mes, dia] = dataISO.split('-');
+    return `${dia}/${mes}/${ano}`;
+  };
 
   return (
     <div className="flex flex-col w-full">
@@ -414,10 +446,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       
                       {sistemaAutomatico && (
                         <div className={`p-4 rounded-lg border ${dentroDoHorario ? 'bg-green-900/20 border-green-800/30' : 'bg-amber-900/20 border-amber-800/30'}`}>
-                          <div className="text-sm font-medium text-zinc-400">Próxima Janela</div>
+                          <div className="text-sm font-medium text-zinc-400">Janela de Funcionamento</div>
                           <div className="mt-1 font-medium">
                             {systemConfig?.dataInicio && 
-                             `${systemConfig.dataInicio.split('-').reverse().join('/')} ${systemConfig.horaInicio} até ${systemConfig?.dataFim?.split('-').reverse().join('/') || ''} ${systemConfig?.horaFim || ''}`}
+                             `${formatarDataBR(systemConfig.dataInicio)} ${systemConfig.horaInicio} até ${formatarDataBR(systemConfig?.dataFim || '')} ${systemConfig?.horaFim || ''}`}
                           </div>
                         </div>
                       )}
@@ -571,9 +603,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     </div>
                     <Switch 
                       checked={sistemaAutomatico} 
-                      onCheckedChange={(value) => {
-                        onUpdateSchedule({ ...systemConfig, modo: value ? 'automatico' : 'manual' });
-                      }}
+                      onCheckedChange={handleModeChange}
                     />
                   </div>
 
