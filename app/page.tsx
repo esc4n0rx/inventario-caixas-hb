@@ -6,10 +6,10 @@ import { motion } from "framer-motion"
 import { z } from "zod"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { Leaf, AlertTriangle } from "lucide-react"
+import { Leaf, AlertTriangle, XCircle, AlertCircle } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
@@ -39,10 +39,12 @@ const formSchema = z.object({
 
 export default function Home() {
   const [showConfirmation, setShowConfirmation] = useState(false)
+  const [showLojaWarning, setShowLojaWarning] = useState(false)
+  const [selectedLoja, setSelectedLoja] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const router = useRouter()
   const { toast } = useToast()
-  const { setUserData, isBlocked, checkSystemStatus,checkLojaStatus } = useStore()
+  const { setUserData, isBlocked, checkSystemStatus, checkLojaStatus } = useStore()
 
   // Verificar status do sistema ao carregar a página
   useEffect(() => {
@@ -76,11 +78,10 @@ export default function Home() {
 
     const lojaJaContou = await checkLojaStatus(values.loja);
     if (lojaJaContou) {
-      toast({
-        title: "Loja já realizou contagem",
-        description: "Esta loja já enviou uma contagem e não pode enviar novamente",
-        variant: "destructive",
-      });
+      // Salvar a loja selecionada para mostrar no aviso
+      setSelectedLoja(values.loja);
+      // Mostrar o popup de aviso
+      setShowLojaWarning(true);
       return;
     }
     
@@ -107,18 +108,24 @@ export default function Home() {
     // Verificar se a loja já fez contagem (novamente, como medida de segurança)
     const lojaJaContou = await checkLojaStatus(form.getValues().loja);
     if (lojaJaContou) {
-      toast({
-        title: "Loja já realizou contagem",
-        description: "Esta loja já enviou uma contagem e não pode enviar novamente",
-        variant: "destructive",
-      });
       setShowConfirmation(false);
+      setSelectedLoja(form.getValues().loja);
+      setShowLojaWarning(true);
       return;
     }
     
     setShowConfirmation(false)
     router.push("/contagem")
   }
+
+  const APP_VERSION = "1.2.0"; // Versão do sistema
+
+  // Função para obter o nome da loja pelo ID
+  const getLojaName = (id: string | null) => {
+    if (!id) return "";
+    const loja = lojas.find(l => l.id === id);
+    return loja ? loja.nome : "";
+  };
 
   return (
     <div className="relative min-h-screen w-full flex items-center justify-center p-4">
@@ -134,45 +141,46 @@ export default function Home() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className="z-10 w-full max-w-md"
+        className="z-10 w-full max-w-xl" // Aumentado de max-w-md para max-w-xl
       >
-        <Card className="bg-[#2C2C2C] text-white border-none shadow-xl">
-          <CardHeader className="space-y-1 items-center text-center">
-            <div className="flex items-center justify-center mb-2">
-              <div className="text-2xl font-bold flex items-center">
+        <Card className="bg-[#2C2C2C] text-white border-none shadow-xl rounded-xl overflow-hidden"> {/* Adicionado rounded-xl para aumentar arredondamento */}
+          <CardHeader className="space-y-2 items-center text-center pb-6 pt-8"> {/* Aumentado padding vertical */}
+            <div className="flex items-center justify-center mb-4"> {/* Aumentado margin-bottom */}
+              <div className="text-3xl font-bold flex items-center"> {/* Aumentado tamanho da fonte */}
                 <span className="text-white">Colheita</span>
                 <span className="text-[#F4C95D]">Certa</span>
-                <Leaf className="h-6 w-6 ml-1 text-[#6DC267] fill-[#6DC267]" />
+                <Leaf className="h-7 w-7 ml-1 text-[#6DC267] fill-[#6DC267]" /> {/* Aumentado ícone */}
               </div>
             </div>
-            <CardTitle className="text-2xl font-bold">Inventário Caixas HB</CardTitle>
-            <CardDescription className="text-zinc-400">
+            <CardTitle className="text-3xl font-bold">Inventário Caixas HB</CardTitle> {/* Aumentado tamanho da fonte */}
+            <CardDescription className="text-zinc-400 text-lg"> {/* Aumentado tamanho da fonte */}
               Selecione sua loja e informe seu email para iniciar
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-8 pb-8"> {/* Aumentado padding horizontal e inferior */}
             {loading ? (
-              <div className="text-center p-4">
-                <p className="text-white">Carregando...</p>
+              <div className="text-center p-8"> {/* Aumentado padding */}
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-[#F4C95D] border-r-2 border-b-2 border-transparent mx-auto mb-4"></div> {/* Animação de carregamento maior */}
+                <p className="text-white text-lg">Carregando...</p> {/* Aumentado tamanho da fonte */}
               </div>
             ) : isBlocked ? (
-              <div className="text-center p-4 bg-red-900/30 rounded-md">
-                <AlertTriangle className="h-8 w-8 mx-auto mb-2 text-red-400" />
-                <p className="text-white font-medium">Contagem temporariamente desativada.</p>
-                <p className="text-zinc-400 mt-2 text-sm">O sistema está em manutenção. Por favor, tente novamente mais tarde.</p>
+              <div className="text-center p-6 bg-red-900/30 rounded-md"> {/* Aumentado padding */}
+                <AlertTriangle className="h-12 w-12 mx-auto mb-4 text-red-400" /> {/* Aumentado ícone */}
+                <p className="text-white font-medium text-xl mb-2">Contagem temporariamente desativada.</p> {/* Aumentado tamanho da fonte */}
+                <p className="text-zinc-400 mt-2 text-base">O sistema está em manutenção. Por favor, tente novamente mais tarde.</p> {/* Aumentado tamanho da fonte */}
               </div>
             ) : (
               <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6"> {/* Aumentado espaçamento */}
                   <FormField
                     control={form.control}
                     name="loja"
                     render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Selecione a Loja</FormLabel>
+                      <FormItem className="mb-4"> {/* Adicionado margin-bottom */}
+                        <FormLabel className="text-base">Selecione a Loja</FormLabel> {/* Aumentado tamanho da fonte */}
                         <Select onValueChange={field.onChange} defaultValue={field.value}>
                           <FormControl>
-                            <SelectTrigger className="bg-zinc-800 border-zinc-700">
+                            <SelectTrigger className="bg-zinc-800 border-zinc-700 h-12 text-base"> {/* Aumentado altura e tamanho da fonte */}
                               <SelectValue placeholder="Selecione uma loja" />
                             </SelectTrigger>
                           </FormControl>
@@ -184,7 +192,7 @@ export default function Home() {
                             ))}
                           </SelectContent>
                         </Select>
-                        <FormMessage />
+                        <FormMessage className="text-base" /> {/* Aumentado tamanho da fonte */}
                       </FormItem>
                     )}
                   />
@@ -192,22 +200,22 @@ export default function Home() {
                     control={form.control}
                     name="email"
                     render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Email</FormLabel>
+                      <FormItem className="mb-4">
+                        <FormLabel className="text-base">Email</FormLabel> 
                         <FormControl>
                           <Input
                             placeholder="seu.email@hortifruti.com.br"
                             {...field}
-                            className="bg-zinc-800 border-zinc-700"
+                            className="bg-zinc-800 border-zinc-700 h-12 text-base" 
                           />
                         </FormControl>
-                        <FormMessage />
+                        <FormMessage className="text-base" /> 
                       </FormItem>
                     )}
                   />
                   <Button
                     type="submit"
-                    className="w-full bg-[#F4C95D] hover:bg-[#e5bb4e] text-black"
+                    className="w-full bg-[#F4C95D] hover:bg-[#e5bb4e] text-black h-12 text-base font-medium mt-4" 
                   >
                     Iniciar Contagem
                   </Button>
@@ -215,37 +223,68 @@ export default function Home() {
               </Form>
             )}
           </CardContent>
+          <CardFooter className="px-8 py-3 bg-zinc-900/50 border-t border-zinc-800 flex justify-center"> 
+            <p className="text-zinc-500 text-sm">ColheitaCerta v{APP_VERSION}</p>
+          </CardFooter>
         </Card>
       </motion.div>
 
       <Dialog open={showConfirmation} onOpenChange={setShowConfirmation}>
-        <DialogContent className="bg-zinc-900 text-white border-zinc-800">
+        <DialogContent className="bg-zinc-900 text-white border-zinc-800 rounded-xl">
           <DialogHeader>
-            <DialogTitle>Confirmar Informações</DialogTitle>
-            <DialogDescription className="text-zinc-400">
+            <DialogTitle className="text-xl">Confirmar Informações</DialogTitle> 
+            <DialogDescription className="text-zinc-400 text-base"> 
               Verifique se os dados estão corretos antes de prosseguir.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
+          <div className="space-y-5 py-4"> 
             <div className="space-y-2">
               <p className="text-sm font-medium text-zinc-400">Loja</p>
-              <p>{lojas.find((l) => l.id === form.getValues().loja)?.nome}</p>
+              <p className="text-lg">{lojas.find((l) => l.id === form.getValues().loja)?.nome}</p> 
             </div>
             <div className="space-y-2">
               <p className="text-sm font-medium text-zinc-400">Email</p>
-              <p>{form.getValues().email}</p>
+              <p className="text-lg">{form.getValues().email}</p>
             </div>
           </div>
           <DialogFooter>
             <Button
               variant="outline"
               onClick={() => setShowConfirmation(false)}
-              className="border-zinc-700 text-white hover:bg-zinc-800"
+              className="border-zinc-700 text-white hover:bg-zinc-800 h-11"
             >
               Editar
             </Button>
-            <Button onClick={handleConfirm} className="bg-[#F4C95D] hover:bg-[#e5bb4e] text-black">
+            <Button onClick={handleConfirm} className="bg-[#F4C95D] hover:bg-[#e5bb4e] text-black h-11"> 
               Confirmar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Novo Dialog de aviso de loja que já realizou contagem */}
+      <Dialog open={showLojaWarning} onOpenChange={setShowLojaWarning}>
+        <DialogContent className="bg-zinc-900 text-white border-zinc-800 rounded-xl max-w-md">
+          <DialogHeader className="space-y-3">
+            <div className="mx-auto bg-amber-900/30 p-3 rounded-full">
+              <AlertCircle className="h-10 w-10 text-amber-500" />
+            </div>
+            <DialogTitle className="text-xl text-center">Contagem Já Realizada</DialogTitle>
+            <DialogDescription className="text-zinc-400 text-base text-center">
+              A loja <span className="text-amber-400 font-medium">{getLojaName(selectedLoja)}</span> já enviou uma contagem para este inventário.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="bg-zinc-800 p-4 rounded-lg border border-zinc-700 my-3">
+            <p className="text-sm text-zinc-300">
+              De acordo com as regras do inventário, cada loja pode enviar apenas uma contagem. Por favor, selecione outra loja ou entre em contato com o administrador caso precise atualizar dados.
+            </p>
+          </div>
+          <DialogFooter className="flex justify-center">
+            <Button 
+              onClick={() => setShowLojaWarning(false)}
+              className="bg-zinc-700 hover:bg-zinc-600 text-white h-11 px-8" 
+            >
+              Entendi
             </Button>
           </DialogFooter>
         </DialogContent>
