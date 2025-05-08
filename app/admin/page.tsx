@@ -365,7 +365,7 @@ export default function Admin() {
   }
 
   return (
-    <div className="relative min-h-screen w-full">
+    <div className="relative w-full h-screen flex items-center justify-center">
       <div
         className="absolute inset-0 bg-cover bg-center z-0"
         style={{
@@ -377,11 +377,12 @@ export default function Admin() {
       {!isAuthenticated ? (
         // Tela de Login
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="z-10 w-full max-w-md p-6 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2"
-        >
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="z-10 w-full max-w-md"
+            //className="z-10 w-full max-w-md absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2"
+          >
           <Card className="bg-[#2C2C2C] text-white border-none shadow-xl rounded-xl overflow-hidden">
             <CardHeader className="space-y-3 pt-8 pb-6 px-8">
               <div className="flex justify-center mb-3">
