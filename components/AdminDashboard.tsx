@@ -435,7 +435,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <CardDescription>Total de itens contados por loja</CardDescription>
                   </CardHeader>
                   <CardContent className="pt-0">
-                    <div className="h-80">
+                    <div className="h-64">
                       <ResponsiveContainer width="100%" height="100%">
                         <BarChart
                           data={dadosContagensPorLoja}
@@ -516,7 +516,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <CardDescription>Quantidade total por tipo de caixa</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="h-80 flex justify-center">
+                  <div className="h-64 flex justify-center">
                     <ResponsiveContainer width="80%" height="100%">
                       <PieChart>
                         <Pie

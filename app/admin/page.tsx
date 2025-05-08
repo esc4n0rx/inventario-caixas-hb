@@ -442,8 +442,8 @@ export default function Admin() {
         </motion.div>
       ) : (
         // Dashboard Administrativo
-        <div className="z-10 relative w-full min-h-screen">
-          <div className="container mx-auto p-6">
+        <div className="z-10 relative w-full h-screen overflow-hidden">
+          <div className="container mx-auto p-6 h-full overflow-auto">
             <div className="flex items-center mb-6">
               <Button
                 variant="outline"
@@ -455,6 +455,7 @@ export default function Admin() {
                 Voltar para Início
               </Button>
             </div>
+            
 
             <AdminDashboard
               contagensData={contagensData}
