@@ -5,6 +5,7 @@ import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { Toaster } from "@/components/ui/toaster"
 import MobileBlocker from "@/components/MobileBlocker"
+import SystemStatusChecker from "@/components/SystemStatusChecker"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -33,6 +34,9 @@ export default function RootLayout({
           disableTransitionOnChange
           storageKey="inventario-caixas-theme"
         >
+          {/* Sistema de verificação automática de status */}
+          <SystemStatusChecker />
+          
           {children}
           <Toaster />
           {/* Bloqueador para dispositivos móveis */}

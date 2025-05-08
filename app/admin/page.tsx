@@ -6,29 +6,48 @@ import { motion } from "framer-motion"
 import { z } from "zod"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { Lock, Unlock, ShieldAlert, FileText, Home, Settings } from "lucide-react"
+import { ShieldAlert, ArrowLeft } from "lucide-react"
 
+// Componentes UI
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
-import { Switch } from "@/components/ui/switch"
 import { useToast } from "@/components/ui/use-toast"
+
+// Importações de dados e serviços
 import { useStore } from "@/lib/store"
 import { supabase } from '@/lib/supabase'
+
+import AdminDashboard from "@/components/AdminDashboard"
 
 const formSchema = z.object({
   password: z.string().min(1, "Senha é obrigatória"),
 })
 
 export default function Admin() {
+  // Estados
   const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const [isUpdating, setIsUpdating] = useState(false)
+  const [contagensData, setContagensData] = useState<any[]>([])
+  const [contagensTransitoData, setContagensTransitoData] = useState<any[]>([])
+  interface SystemConfig {
+    bloqueado: boolean;
+    modo: "automatico" | "manual";
+    dataInicio: string;
+    horaInicio: string;
+    dataFim: string;
+    horaFim: string;
+  }
+  const [systemConfig, setSystemConfig] = useState<SystemConfig | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const APP_VERSION = "1.2.0";
+  
+  // Hooks
   const router = useRouter()
   const { toast } = useToast()
-  const { isBlocked, setIsBlocked } = useStore()
-  const APP_VERSION = "1.2.0"; // Versão do sistema
-
+  const { setIsBlocked } = useStore()
+  
+  // Configuração do formulário
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -36,32 +55,104 @@ export default function Admin() {
     },
   })
 
-  // Verificar o estado atual do sistema quando a página carrega
+  // Carregar dados do sistema ao iniciar
   useEffect(() => {
-    const checkSystemStatus = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('configuracao_sistema')
-          .select('valor')
-          .eq('chave', 'sistema_bloqueado')
-          .single();
-        
-        if (error) throw error;
-        
-        setIsBlocked(data.valor === 'true');
-      } catch (error) {
-        console.error('Erro ao verificar status do sistema:', error);
-        toast({
-          title: "Erro ao verificar status",
-          description: "Não foi possível verificar o estado atual do sistema",
-          variant: "destructive",
-        });
-      }
-    };
-    
-    checkSystemStatus();
-  }, [setIsBlocked, toast]);
+    if (isAuthenticated) {
+      fetchSystemData()
+    }
+  }, [isAuthenticated])
 
+  // Função para buscar todos os dados do sistema
+  const fetchSystemData = async () => {
+    setIsLoading(true)
+    
+    try {
+      // Buscar configurações do sistema
+      const { data: configData, error: configError } = await supabase
+        .from('configuracao_sistema')
+        .select('*')
+      
+      if (configError) throw configError
+      
+      // Processar configurações
+      const configMap: { [key: string]: string } = {}
+      configData.forEach(item => {
+        configMap[item.chave] = item.valor
+      })
+      
+      const parsedConfig = {
+        bloqueado: configMap['sistema_bloqueado'] === 'true',
+        modo: (configMap['sistema_modo'] || 'manual') as 'automatico' | 'manual',
+        dataInicio: configMap['data_inicio'] || '',
+        horaInicio: configMap['hora_inicio'] || '',
+        dataFim: configMap['data_fim'] || '',
+        horaFim: configMap['hora_fim'] || ''
+      }
+      
+      setSystemConfig(parsedConfig)
+      setIsBlocked(parsedConfig.bloqueado)
+      
+      // Buscar contagens
+      await fetchContagens()
+      
+      // Buscar contagens de trânsito
+      await fetchContagensTransito()
+      
+    } catch (error) {
+      console.error('Erro ao buscar dados do sistema:', error)
+      toast({
+        title: "Erro ao carregar dados",
+        description: "Não foi possível carregar todas as informações do sistema.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // Buscar contagens
+  const fetchContagens = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('contagens')
+        .select('*')
+        .order('data_registro', { ascending: false })
+      
+      if (error) throw error
+      
+      setContagensData(data || [])
+    } catch (error) {
+      console.error('Erro ao buscar contagens:', error)
+      toast({
+        title: "Erro",
+        description: "Não foi possível carregar as contagens",
+        variant: "destructive",
+      })
+    }
+  }
+
+  // Buscar contagens de trânsito
+  const fetchContagensTransito = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('contagens_transito')
+        .select('*')
+        .order('data_registro', { ascending: false })
+      
+      if (error) throw error
+      
+      setContagensTransitoData(data || [])
+    } catch (error) {
+      console.error('Erro ao buscar contagens de trânsito:', error)
+      toast({
+        title: "Erro",
+        description: "Não foi possível carregar as contagens de trânsito",
+        variant: "destructive",
+      })
+    }
+  }
+
+  // Autenticar usuário
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     try {
       const response = await fetch('/api/admin/verificar', {
@@ -70,68 +161,211 @@ export default function Admin() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ senha: values.password }),
-      });
+      })
       
-      const data = await response.json();
+      const data = await response.json()
       
       if (data.autorizado) {
-        setIsAuthenticated(true);
+        setIsAuthenticated(true)
         toast({
           title: "Autenticado com sucesso",
           description: "Bem-vindo à área administrativa",
-        });
+        })
       } else {
         toast({
           title: "Senha incorreta",
           description: "Por favor, tente novamente",
           variant: "destructive",
-        });
+        })
       }
     } catch (error) {
-      console.error('Erro ao verificar senha:', error);
+      console.error('Erro ao verificar senha:', error)
       toast({
         title: "Erro de autenticação",
         description: "Ocorreu um erro ao verificar a senha. Tente novamente.",
         variant: "destructive",
-      });
+      })
     }
   }
 
-  const handleToggleBlock = async () => {
-    setIsUpdating(true);
+  // Atualizar configurações de agendamento
+  const handleUpdateSchedule = async (scheduleData:any) => {
     try {
-      const { error } = await supabase
+      // Atualizar modo (manual/automático)
+      await supabase
         .from('configuracao_sistema')
-        .update({ 
-          valor: !isBlocked ? 'true' : 'false',
-          data_modificacao: new Date().toISOString()
+        .upsert({ 
+          chave: 'sistema_modo', 
+          valor: scheduleData.modo,
+          data_modificacao: new Date().toISOString() 
         })
-        .eq('chave', 'sistema_bloqueado');
       
-      if (error) throw error;
+      // Se for modo automático, atualizar datas e horas
+      if (scheduleData.modo === 'automatico') {
+        // Data início
+        await supabase
+          .from('configuracao_sistema')
+          .upsert({ 
+            chave: 'data_inicio', 
+            valor: scheduleData.dataInicio,
+            data_modificacao: new Date().toISOString() 
+          })
+        
+        // Hora início
+        await supabase
+          .from('configuracao_sistema')
+          .upsert({ 
+            chave: 'hora_inicio', 
+            valor: scheduleData.horaInicio,
+            data_modificacao: new Date().toISOString() 
+          })
+        
+        // Data fim
+        await supabase
+          .from('configuracao_sistema')
+          .upsert({ 
+            chave: 'data_fim', 
+            valor: scheduleData.dataFim,
+            data_modificacao: new Date().toISOString() 
+          })
+        
+        // Hora fim
+        await supabase
+          .from('configuracao_sistema')
+          .upsert({ 
+            chave: 'hora_fim', 
+            valor: scheduleData.horaFim,
+            data_modificacao: new Date().toISOString() 
+          })
+      }
       
-      // Atualizar estado local
-      setIsBlocked(!isBlocked);
+      // Verificar se o sistema deve estar bloqueado com base nas novas configurações
+      if (scheduleData.modo === 'automatico') {
+        const agora = new Date()
+        const dataInicio = new Date(`${scheduleData.dataInicio}T${scheduleData.horaInicio}`)
+        const dataFim = new Date(`${scheduleData.dataFim}T${scheduleData.horaFim}`)
+        
+        const deveBloqueado = !(agora >= dataInicio && agora <= dataFim)
+        
+        await handleToggleSystem(!deveBloqueado, false) // Não mostrar toasts
+      }
+      
       toast({
-        title: isBlocked ? "Contagem desbloqueada" : "Contagem bloqueada",
-        description: isBlocked
-          ? "Os usuários agora podem realizar contagens"
-          : "Os usuários não poderão iniciar novas contagens",
-      });
+        title: "Configurações salvas",
+        description: "As configurações de agendamento foram atualizadas com sucesso",
+      })
+      
+      // Recarregar dados
+      await fetchSystemData()
     } catch (error) {
-      console.error('Erro ao atualizar estado do sistema:', error);
+      console.error('Erro ao atualizar configurações:', error)
       toast({
         title: "Erro",
-        description: "Erro ao atualizar o sistema. Tente novamente.",
+        description: "Não foi possível atualizar as configurações de agendamento",
         variant: "destructive",
-      });
-    } finally {
-      setIsUpdating(false);
+      })
     }
-  };
+  }
+
+  // Ligar/desligar sistema
+  const handleToggleSystem = async (ativar:any, showToast = true) => {
+    try {
+      await supabase
+        .from('configuracao_sistema')
+        .update({ 
+          valor: ativar ? 'false' : 'true',
+          data_modificacao: new Date().toISOString()
+        })
+        .eq('chave', 'sistema_bloqueado')
+      
+      // Atualizar estado local
+      setSystemConfig(prev => prev ? {
+        ...prev,
+        bloqueado: !ativar
+      } : null)
+      
+      // Atualizar estado global
+      setIsBlocked(!ativar)
+      
+      if (showToast) {
+        toast({
+          title: ativar ? "Sistema ativado" : "Sistema desativado",
+          description: ativar 
+            ? "O sistema está aberto para contagens" 
+            : "O sistema está bloqueado para contagens",
+        })
+      }
+    } catch (error) {
+      console.error('Erro ao atualizar estado do sistema:', error)
+      if (showToast) {
+        toast({
+          title: "Erro",
+          description: "Não foi possível alterar o estado do sistema",
+          variant: "destructive",
+        })
+      }
+    }
+  }
+
+  // Remover contagem
+  const handleRemoveContagem = async (id: any) => {
+    try {
+      const { error } = await supabase
+        .from('contagens')
+        .delete()
+        .eq('id', id)
+      
+      if (error) throw error
+      
+      toast({
+        title: "Contagem removida",
+        description: "A contagem foi removida com sucesso",
+      })
+      
+      // Recarregar dados
+      await fetchContagens()
+    } catch (error) {
+      console.error('Erro ao remover contagem:', error)
+      toast({
+        title: "Erro",
+        description: "Não foi possível remover a contagem",
+        variant: "destructive",
+      })
+    }
+  }
+
+  // Editar contagem
+  const handleEditContagem = async (id: any, quantidade: any) => {
+    try {
+      const { error } = await supabase
+        .from('contagens')
+        .update({ 
+          quantidade,
+          data_modificacao: new Date().toISOString()
+        })
+        .eq('id', id)
+      
+      if (error) throw error
+      
+      toast({
+        title: "Contagem atualizada",
+        description: "A contagem foi atualizada com sucesso",
+      })
+      
+      // Recarregar dados
+      await fetchContagens()
+    } catch (error) {
+      console.error('Erro ao editar contagem:', error)
+      toast({
+        title: "Erro",
+        description: "Não foi possível atualizar a contagem",
+        variant: "destructive",
+      })
+    }
+  }
 
   return (
-    <div className="relative min-h-screen w-full flex items-center justify-center p-4">
+    <div className="relative min-h-screen w-full">
       <div
         className="absolute inset-0 bg-cover bg-center z-0"
         style={{
@@ -140,26 +374,27 @@ export default function Admin() {
         }}
       />
 
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="z-10 w-full max-w-xl"
-      >
-        <Card className="bg-[#2C2C2C] text-white border-none shadow-xl rounded-xl overflow-hidden">
-          <CardHeader className="space-y-3 pt-8 pb-6 px-8">
-            <div className="flex justify-center mb-2">
-              <div className="p-4 bg-zinc-800/80 rounded-full">
-                <ShieldAlert className="h-16 w-16 text-[#F4C95D]" />
+      {!isAuthenticated ? (
+        // Tela de Login
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="z-10 w-full max-w-md p-6 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2"
+        >
+          <Card className="bg-[#2C2C2C] text-white border-none shadow-xl rounded-xl overflow-hidden">
+            <CardHeader className="space-y-3 pt-8 pb-6 px-8">
+              <div className="flex justify-center mb-3">
+                <div className="p-4 bg-zinc-800/80 rounded-full">
+                  <ShieldAlert className="h-16 w-16 text-[#F4C95D]" />
+                </div>
               </div>
-            </div>
-            <CardTitle className="text-3xl font-bold text-center">Área Administrativa</CardTitle>
-            <CardDescription className="text-zinc-400 text-center text-lg">
-              {isAuthenticated ? "Gerencie as configurações do sistema" : "Faça login para acessar as configurações"}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="px-8 pb-8">
-            {!isAuthenticated ? (
+              <CardTitle className="text-3xl font-bold text-center">Área Administrativa</CardTitle>
+              <CardDescription className="text-zinc-400 text-lg text-center">
+                Digite a senha para acessar o painel administrativo
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="px-8 pb-8">
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                   <FormField
@@ -184,76 +419,56 @@ export default function Admin() {
                     type="submit" 
                     className="w-full bg-[#F4C95D] hover:bg-[#e5bb4e] text-black h-14 text-lg font-medium mt-6"
                   >
-                    <Settings className="mr-2 h-5 w-5" />
-                    Acessar Painel
+                    Acessar Dashboard
                   </Button>
                 </form>
               </Form>
-            ) : (
-              <div className="space-y-8">
-                <div className="bg-zinc-900/60 rounded-xl p-6 border border-zinc-800/80">
-                  <h2 className="text-xl font-medium mb-4 flex items-center">
-                    <Settings className="h-6 w-6 text-[#F4C95D] mr-2" />
-                    Configurações do Sistema
-                  </h2>
-                  
-                  <div className="space-y-6">
-                    <div className="flex items-center justify-between p-5 bg-zinc-800 rounded-lg shadow-md border border-zinc-700/30 hover:bg-zinc-800/80 transition-colors">
-                      <div className="space-y-1">
-                        <h3 className="font-medium text-lg">Bloquear Contagem</h3>
-                        <p className="text-base text-zinc-400">
-                          {isBlocked
-                            ? "A contagem está bloqueada para todos os usuários"
-                            : "A contagem está liberada para todos os usuários"}
-                        </p>
-                      </div>
-                      <div className="flex items-center">
-                        {isBlocked ? (
-                          <div className="flex items-center justify-center bg-red-900/20 p-2 rounded-lg mr-4">
-                            <Lock className="h-6 w-6 text-red-400" />
-                          </div>
-                        ) : (
-                          <div className="flex items-center justify-center bg-green-900/20 p-2 rounded-lg mr-4">
-                            <Unlock className="h-6 w-6 text-green-400" />
-                          </div>
-                        )}
-                        <Switch 
-                          checked={isBlocked} 
-                          onCheckedChange={handleToggleBlock} 
-                          disabled={isUpdating}
-                          className="scale-125"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <Button
-                    onClick={() => router.push("/admin/contagens")}
-                    className="bg-[#F4C95D] hover:bg-[#e5bb4e] text-black h-14 text-base font-medium"
-                  >
-                    <FileText className="mr-2 h-5 w-5" />
-                    Ver Histórico de Contagens
-                  </Button>
-
-                  <Button
-                    onClick={() => router.push("/")}
-                    variant="outline"
-                    className="border-zinc-700 text-white hover:bg-zinc-800 h-14 text-base font-medium"
-                  >
-                    <Home className="mr-2 h-5 w-5" />
-                    Voltar para a Página Inicial
-                  </Button>
-                </div>
+              <div className="mt-6 text-center">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => router.push("/")}
+                  className="text-zinc-500 hover:text-white hover:bg-zinc-800"
+                >
+                  Voltar para a página inicial
+                </Button>
               </div>
-            )}
-          </CardContent>
-          <CardFooter className="px-8 py-3 bg-zinc-900/50 border-t border-zinc-800 flex justify-center">
-            <p className="text-zinc-500 text-sm">ColheitaCerta v{APP_VERSION} - Painel Administrativo</p>
-          </CardFooter>
-        </Card>
-      </motion.div>
+            </CardContent>
+            <div className="px-8 py-3 bg-zinc-900/50 border-t border-zinc-800 flex justify-center">
+              <p className="text-zinc-500 text-sm">ColheitaCerta v{APP_VERSION} - Painel Administrativo</p>
+            </div>
+          </Card>
+        </motion.div>
+      ) : (
+        // Dashboard Administrativo
+        <div className="z-10 relative w-full min-h-screen">
+          <div className="container mx-auto p-6">
+            <div className="flex items-center mb-6">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => router.push("/")}
+                className="border-zinc-700 text-white hover:bg-zinc-800 h-9 mr-4"
+              >
+                <ArrowLeft className="mr-1 h-4 w-4" />
+                Voltar para Início
+              </Button>
+            </div>
+
+            <AdminDashboard
+              contagensData={contagensData}
+              contagensTransitoData={contagensTransitoData}
+              systemConfig={systemConfig}
+              isLoading={isLoading}
+              onRefresh={fetchSystemData}
+              onUpdateSchedule={handleUpdateSchedule}
+              onToggleSystem={handleToggleSystem}
+              onRemoveContagem={handleRemoveContagem}
+              onEditContagem={handleEditContagem}
+            />
+          </div>
+        </div>
+      )}
     </div>
   )
 }
