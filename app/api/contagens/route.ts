@@ -1,4 +1,4 @@
-// app/api/contagens/route.ts
+
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { ativos } from '@/data/ativos';
@@ -15,7 +15,6 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    // Verificar se o sistema está bloqueado
     const { data: configData, error: configError } = await supabase
       .from('configuracao_sistema')
       .select('valor')
@@ -31,7 +30,6 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    // Encontrar nome da loja
     const loja = lojas.find(l => l.id === userData.loja);
     if (!loja) {
       return NextResponse.json(
@@ -40,7 +38,7 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    // Preparar registros para inserção em batch
+
     const registros = ativos.map(ativo => ({
       email: userData.email,
       loja: userData.loja,
@@ -50,7 +48,7 @@ export async function POST(request: NextRequest) {
       quantidade: contagem[ativo.id] || 0
     }));
     
-    // Inserir todos os registros de uma vez
+
     const { data, error } = await supabase
       .from('contagens')
       .insert(registros)
@@ -72,7 +70,6 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Endpoint para buscar contagens
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;

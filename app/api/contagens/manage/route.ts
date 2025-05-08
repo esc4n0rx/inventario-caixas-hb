@@ -1,4 +1,4 @@
-// app/api/contagens/manage/route.ts
+
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 

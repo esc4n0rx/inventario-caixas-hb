@@ -4,7 +4,6 @@ export async function POST(request: NextRequest) {
   try {
     const { senha } = await request.json();
     
-    // Verificar a senha com a variável de ambiente
     const adminPassword = process.env.ADMIN_PASSWORD;
     
     if (!adminPassword) {

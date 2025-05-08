@@ -71,13 +71,11 @@ import { formatarData } from '@/lib/utils';
 import { lojas } from '@/data/lojas';
 import { ativos } from '@/data/ativos';
 
-// Cores para os gráficos
 const COLORS = [
   '#F4C95D', '#7C96AB', '#6DC267', '#F87171', '#60A5FA',
   '#C084FC', '#FB923C', '#34D399', '#A3E635', '#FBBF24',
 ];
 
-// Tipagens
 export interface Contagem {
   id: string;
   loja: string;
@@ -155,12 +153,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   }, [systemConfig]);
 
-  // Estatísticas
   const totalLojas = lojas.length;
   const lojasComContagem = new Set(contagensData.map((c) => c.loja)).size;
   const progressoInventario = (lojasComContagem / totalLojas) * 100;
 
-  // Handlers
   const handleRefresh = async (): Promise<void> => {
     setRefreshing(true);
     await onRefresh();
@@ -191,7 +187,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setShowScheduleDialog(false);
   };
 
-  // Função para lidar com a mudança de modo (manual/automático)
   const handleModeChange = (value: boolean) => {
     const newMode = value ? 'automatico' : 'manual';
     setScheduleForm({
@@ -199,11 +194,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       modo: newMode
     });
     
-    // Se mudar para modo automático e não tiver configuração de horário, abrir o diálogo
     if (value && (!systemConfig?.dataInicio || !systemConfig?.horaInicio)) {
       setShowScheduleDialog(true);
     } else {
-      // Caso contrário, atualizar a configuração diretamente
       onUpdateSchedule({ modo: newMode });
     }
   };
@@ -225,7 +218,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     return (total / (horas || 1)).toFixed(1);
   };
 
-  // Preparar dados para gráficos
   const prepararDadosContagensPorLoja = (): Array<{ loja: string; total: number }> => {
     const agg: Record<string, { loja: string; total: number }> = {};
     contagensData.forEach((c) => {
@@ -273,7 +265,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const dentroDoHorario = verificarHorarioProgramado();
 
-  // Formatar data para exibição no formato brasileiro
   const formatarDataBR = (dataISO: string): string => {
     if (!dataISO) return '';
     const [ano, mes, dia] = dataISO.split('-');
@@ -282,7 +273,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   return (
     <div className="flex flex-col w-full">
-      {/* Cabeçalho e controles */}
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-2xl font-bold flex items-center">

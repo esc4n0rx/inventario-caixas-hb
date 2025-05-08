@@ -46,7 +46,6 @@ export default function Home() {
   const { toast } = useToast()
   const { setUserData, isBlocked, checkSystemStatus, checkLojaStatus } = useStore()
 
-  // Verificar status do sistema ao carregar a página
   useEffect(() => {
     const loadSystemStatus = async () => {
       setLoading(true);
@@ -66,7 +65,6 @@ export default function Home() {
   })
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
-    // Verificar novamente se o sistema está bloqueado antes de prosseguir
     if (isBlocked) {
       toast({
         title: "Sistema bloqueado",
@@ -78,9 +76,7 @@ export default function Home() {
 
     const lojaJaContou = await checkLojaStatus(values.loja);
     if (lojaJaContou) {
-      // Salvar a loja selecionada para mostrar no aviso
       setSelectedLoja(values.loja);
-      // Mostrar o popup de aviso
       setShowLojaWarning(true);
       return;
     }
@@ -94,7 +90,6 @@ export default function Home() {
   }
 
   const handleConfirm = async () => {
-    // Verificar novamente se o sistema está bloqueado antes de redirecionar
     if (isBlocked) {
       toast({
         title: "Sistema bloqueado",
@@ -105,7 +100,6 @@ export default function Home() {
       return;
     }
 
-    // Verificar se a loja já fez contagem (novamente, como medida de segurança)
     const lojaJaContou = await checkLojaStatus(form.getValues().loja);
     if (lojaJaContou) {
       setShowConfirmation(false);
@@ -118,9 +112,8 @@ export default function Home() {
     router.push("/contagem")
   }
 
-  const APP_VERSION = "1.2.0"; // Versão do sistema
+  const APP_VERSION = "1.2.0"; 
 
-  // Função para obter o nome da loja pelo ID
   const getLojaName = (id: string | null) => {
     if (!id) return "";
     const loja = lojas.find(l => l.id === id);
@@ -141,46 +134,46 @@ export default function Home() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className="z-10 w-full max-w-xl" // Aumentado de max-w-md para max-w-xl
+        className="z-10 w-full max-w-xl" 
       >
-        <Card className="bg-[#2C2C2C] text-white border-none shadow-xl rounded-xl overflow-hidden"> {/* Adicionado rounded-xl para aumentar arredondamento */}
-          <CardHeader className="space-y-2 items-center text-center pb-6 pt-8"> {/* Aumentado padding vertical */}
-            <div className="flex items-center justify-center mb-4"> {/* Aumentado margin-bottom */}
-              <div className="text-3xl font-bold flex items-center"> {/* Aumentado tamanho da fonte */}
+        <Card className="bg-[#2C2C2C] text-white border-none shadow-xl rounded-xl overflow-hidden"> 
+          <CardHeader className="space-y-2 items-center text-center pb-6 pt-8"> 
+            <div className="flex items-center justify-center mb-4"> 
+              <div className="text-3xl font-bold flex items-center"> 
                 <span className="text-white">Colheita</span>
                 <span className="text-[#F4C95D]">Certa</span>
-                <Leaf className="h-7 w-7 ml-1 text-[#6DC267] fill-[#6DC267]" /> {/* Aumentado ícone */}
+                <Leaf className="h-7 w-7 ml-1 text-[#6DC267] fill-[#6DC267]" /> 
               </div>
             </div>
-            <CardTitle className="text-3xl font-bold">Inventário Caixas HB</CardTitle> {/* Aumentado tamanho da fonte */}
-            <CardDescription className="text-zinc-400 text-lg"> {/* Aumentado tamanho da fonte */}
+            <CardTitle className="text-3xl font-bold">Inventário Caixas HB</CardTitle> 
+            <CardDescription className="text-zinc-400 text-lg"> 
               Selecione sua loja e informe seu email para iniciar
             </CardDescription>
           </CardHeader>
-          <CardContent className="px-8 pb-8"> {/* Aumentado padding horizontal e inferior */}
+          <CardContent className="px-8 pb-8">
             {loading ? (
-              <div className="text-center p-8"> {/* Aumentado padding */}
-                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-[#F4C95D] border-r-2 border-b-2 border-transparent mx-auto mb-4"></div> {/* Animação de carregamento maior */}
-                <p className="text-white text-lg">Carregando...</p> {/* Aumentado tamanho da fonte */}
+              <div className="text-center p-8"> 
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-[#F4C95D] border-r-2 border-b-2 border-transparent mx-auto mb-4"></div>
+                <p className="text-white text-lg">Carregando...</p> 
               </div>
             ) : isBlocked ? (
-              <div className="text-center p-6 bg-red-900/30 rounded-md"> {/* Aumentado padding */}
-                <AlertTriangle className="h-12 w-12 mx-auto mb-4 text-red-400" /> {/* Aumentado ícone */}
-                <p className="text-white font-medium text-xl mb-2">Contagem temporariamente desativada.</p> {/* Aumentado tamanho da fonte */}
-                <p className="text-zinc-400 mt-2 text-base">O sistema está em manutenção. Por favor, tente novamente mais tarde.</p> {/* Aumentado tamanho da fonte */}
+              <div className="text-center p-6 bg-red-900/30 rounded-md"> 
+                <AlertTriangle className="h-12 w-12 mx-auto mb-4 text-red-400" /> 
+                <p className="text-white font-medium text-xl mb-2">Contagem temporariamente desativada.</p>
+                <p className="text-zinc-400 mt-2 text-base">O sistema está em manutenção. Por favor, tente novamente mais tarde.</p> 
               </div>
             ) : (
               <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6"> {/* Aumentado espaçamento */}
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6"> 
                   <FormField
                     control={form.control}
                     name="loja"
                     render={({ field }) => (
-                      <FormItem className="mb-4"> {/* Adicionado margin-bottom */}
-                        <FormLabel className="text-base">Selecione a Loja</FormLabel> {/* Aumentado tamanho da fonte */}
+                      <FormItem className="mb-4">
+                        <FormLabel className="text-base">Selecione a Loja</FormLabel> 
                         <Select onValueChange={field.onChange} defaultValue={field.value}>
                           <FormControl>
-                            <SelectTrigger className="bg-zinc-800 border-zinc-700 h-12 text-base"> {/* Aumentado altura e tamanho da fonte */}
+                            <SelectTrigger className="bg-zinc-800 border-zinc-700 h-12 text-base">
                               <SelectValue placeholder="Selecione uma loja" />
                             </SelectTrigger>
                           </FormControl>
@@ -192,7 +185,7 @@ export default function Home() {
                             ))}
                           </SelectContent>
                         </Select>
-                        <FormMessage className="text-base" /> {/* Aumentado tamanho da fonte */}
+                        <FormMessage className="text-base" />
                       </FormItem>
                     )}
                   />
@@ -262,7 +255,6 @@ export default function Home() {
         </DialogContent>
       </Dialog>
 
-      {/* Novo Dialog de aviso de loja que já realizou contagem */}
       <Dialog open={showLojaWarning} onOpenChange={setShowLojaWarning}>
         <DialogContent className="bg-zinc-900 text-white border-zinc-800 rounded-xl max-w-md">
           <DialogHeader className="space-y-3">

@@ -1,4 +1,4 @@
-// app/api/loja/verificar/route.ts
+
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 
@@ -14,7 +14,6 @@ export async function GET(request: NextRequest) {
       );
     }
     
-    // Verificar se a loja já fez contagem
     const { data, error, count } = await supabase
       .from('contagens')
       .select('id', { count: 'exact' })

@@ -8,14 +8,12 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { ShieldAlert, ArrowLeft } from "lucide-react"
 
-// Componentes UI
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { useToast } from "@/components/ui/use-toast"
 
-// Importações de dados e serviços
 import { useStore } from "@/lib/store"
 import { supabase } from '@/lib/supabase'
 
@@ -26,7 +24,7 @@ const formSchema = z.object({
 })
 
 export default function Admin() {
-  // Estados
+
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [contagensData, setContagensData] = useState<any[]>([])
   const [contagensTransitoData, setContagensTransitoData] = useState<any[]>([])
@@ -42,12 +40,11 @@ export default function Admin() {
   const [isLoading, setIsLoading] = useState(true)
   const APP_VERSION = "1.2.0";
   
-  // Hooks
   const router = useRouter()
   const { toast } = useToast()
   const { setIsBlocked } = useStore()
   
-  // Configuração do formulário
+
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -55,26 +52,26 @@ export default function Admin() {
     },
   })
 
-  // Carregar dados do sistema ao iniciar
+
   useEffect(() => {
     if (isAuthenticated) {
       fetchSystemData()
     }
   }, [isAuthenticated])
 
-  // Função para buscar todos os dados do sistema
+
   const fetchSystemData = async () => {
     setIsLoading(true)
     
     try {
-      // Buscar configurações do sistema
+
       const { data: configData, error: configError } = await supabase
         .from('configuracao_sistema')
         .select('*')
       
       if (configError) throw configError
       
-      // Processar configurações
+
       const configMap: { [key: string]: string } = {}
       configData.forEach(item => {
         configMap[item.chave] = item.valor
@@ -92,10 +89,10 @@ export default function Admin() {
       setSystemConfig(parsedConfig)
       setIsBlocked(parsedConfig.bloqueado)
       
-      // Buscar contagens
+  
       await fetchContagens()
       
-      // Buscar contagens de trânsito
+
       await fetchContagensTransito()
       
     } catch (error) {
@@ -110,7 +107,7 @@ export default function Admin() {
     }
   }
 
-  // Buscar contagens
+
   const fetchContagens = async () => {
     try {
       const { data, error } = await supabase
@@ -131,7 +128,7 @@ export default function Admin() {
     }
   }
 
-  // Buscar contagens de trânsito
+
   const fetchContagensTransito = async () => {
     try {
       const { data, error } = await supabase
@@ -152,7 +149,7 @@ export default function Admin() {
     }
   }
 
-  // Autenticar usuário
+
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     try {
       const response = await fetch('/api/admin/verificar', {
@@ -188,10 +185,10 @@ export default function Admin() {
     }
   }
 
-  // Atualizar configurações de agendamento
+
   const handleUpdateSchedule = async (scheduleData:any) => {
     try {
-      // Atualizar modo (manual/automático)
+
       await supabase
         .from('configuracao_sistema')
         .upsert({ 
@@ -200,9 +197,8 @@ export default function Admin() {
           data_modificacao: new Date().toISOString() 
         })
       
-      // Se for modo automático, atualizar datas e horas
       if (scheduleData.modo === 'automatico') {
-        // Data início
+
         await supabase
           .from('configuracao_sistema')
           .upsert({ 
@@ -211,7 +207,6 @@ export default function Admin() {
             data_modificacao: new Date().toISOString() 
           })
         
-        // Hora início
         await supabase
           .from('configuracao_sistema')
           .upsert({ 
@@ -220,7 +215,6 @@ export default function Admin() {
             data_modificacao: new Date().toISOString() 
           })
         
-        // Data fim
         await supabase
           .from('configuracao_sistema')
           .upsert({ 
@@ -229,7 +223,7 @@ export default function Admin() {
             data_modificacao: new Date().toISOString() 
           })
         
-        // Hora fim
+
         await supabase
           .from('configuracao_sistema')
           .upsert({ 
@@ -239,7 +233,6 @@ export default function Admin() {
           })
       }
       
-      // Verificar se o sistema deve estar bloqueado com base nas novas configurações
       if (scheduleData.modo === 'automatico') {
         const agora = new Date()
         const dataInicio = new Date(`${scheduleData.dataInicio}T${scheduleData.horaInicio}`)
@@ -247,7 +240,7 @@ export default function Admin() {
         
         const deveBloqueado = !(agora >= dataInicio && agora <= dataFim)
         
-        await handleToggleSystem(!deveBloqueado, false) // Não mostrar toasts
+        await handleToggleSystem(!deveBloqueado, false) 
       }
       
       toast({
@@ -255,7 +248,7 @@ export default function Admin() {
         description: "As configurações de agendamento foram atualizadas com sucesso",
       })
       
-      // Recarregar dados
+
       await fetchSystemData()
     } catch (error) {
       console.error('Erro ao atualizar configurações:', error)
@@ -267,7 +260,7 @@ export default function Admin() {
     }
   }
 
-  // Ligar/desligar sistema
+
   const handleToggleSystem = async (ativar:any, showToast = true) => {
     try {
       await supabase
@@ -278,13 +271,12 @@ export default function Admin() {
         })
         .eq('chave', 'sistema_bloqueado')
       
-      // Atualizar estado local
+
       setSystemConfig(prev => prev ? {
         ...prev,
         bloqueado: !ativar
       } : null)
       
-      // Atualizar estado global
       setIsBlocked(!ativar)
       
       if (showToast) {
@@ -307,7 +299,6 @@ export default function Admin() {
     }
   }
 
-  // Remover contagem
   const handleRemoveContagem = async (id: any) => {
     try {
       const { error } = await supabase
@@ -322,7 +313,6 @@ export default function Admin() {
         description: "A contagem foi removida com sucesso",
       })
       
-      // Recarregar dados
       await fetchContagens()
     } catch (error) {
       console.error('Erro ao remover contagem:', error)
@@ -334,7 +324,6 @@ export default function Admin() {
     }
   }
 
-  // Editar contagem
   const handleEditContagem = async (id: any, quantidade: any) => {
     try {
       const { error } = await supabase
@@ -352,7 +341,6 @@ export default function Admin() {
         description: "A contagem foi atualizada com sucesso",
       })
       
-      // Recarregar dados
       await fetchContagens()
     } catch (error) {
       console.error('Erro ao editar contagem:', error)
@@ -375,7 +363,6 @@ export default function Admin() {
       />
 
       {!isAuthenticated ? (
-        // Tela de Login
         <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -441,7 +428,6 @@ export default function Admin() {
           </Card>
         </motion.div>
       ) : (
-        // Dashboard Administrativo
         <div className="z-10 relative w-full h-screen overflow-hidden">
           <div className="container mx-auto p-6 h-full overflow-auto">
             <div className="flex items-center mb-6">

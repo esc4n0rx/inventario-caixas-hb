@@ -12,7 +12,7 @@ const inter = Inter({ subsets: ["latin"] })
 export const metadata: Metadata = {
   title: "Inventário Caixas HB",
   description: "Sistema de contagem de caixas para Hortifruti",
-  generator: 'v0.dev'
+  generator: 'Paulo Oliveira',
 }
 
 export default function RootLayout({
@@ -23,7 +23,6 @@ export default function RootLayout({
   return (
     <html lang="pt-BR" suppressHydrationWarning>
       <head>
-        {/* Meta tag para melhorar a detecção de dispositivos móveis */}
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
       </head>
       <body className={inter.className}>
@@ -34,12 +33,10 @@ export default function RootLayout({
           disableTransitionOnChange
           storageKey="inventario-caixas-theme"
         >
-          {/* Sistema de verificação automática de status */}
           <SystemStatusChecker />
           
           {children}
           <Toaster />
-          {/* Bloqueador para dispositivos móveis */}
           <MobileBlocker />
         </ThemeProvider>
       </body>

@@ -66,16 +66,14 @@ export default function Contagem() {
   const APP_VERSION = "1.2.0"; // Versão do sistema
 
   useEffect(() => {
-    // Verificar status do sistema
     checkSystemStatus();
     
-    // Redirect if no user data
+
     if (!userData.loja || !userData.email) {
       router.push("/")
       return
     }
 
-    // Redirecionar se o sistema estiver bloqueado
     if (isBlocked) {
       toast({
         title: "Sistema bloqueado",
@@ -100,26 +98,23 @@ export default function Contagem() {
     };
     verificarLoja();
 
-    // Mostrar modal de seleção para CD
     if (isCdLocation && !countType && !transitoCompleted) {
       setShowCdTypeModal(true);
     }
 
-    // Update form when step changes
     if (ativos[currentStep]) {
       form.setValue("quantidade", contagem[ativos[currentStep].id] || 0);
     }
   }, [currentStep, userData, router, form, contagem, isBlocked, checkSystemStatus, toast, countType, isCdLocation, transitoCompleted])
 
   const onSubmit = (values: z.infer<typeof formSchema>) => {
-    // Save current count
     setContagem(ativos[currentStep].id, values.quantidade)
 
     if (currentStep === ativos.length - 1) {
-      // Last step - show review
+      
       setShowReview(true)
     } else {
-      // Move to next step
+
       setCurrentStep(currentStep + 1)
     }
   }
@@ -128,7 +123,6 @@ export default function Contagem() {
     setIsSubmitting(true);
 
     try {
-      // Verificar se o sistema está bloqueado
       const { data: configData, error: configError } = await supabase
         .from('configuracao_sistema')
         .select('valor')
@@ -148,7 +142,6 @@ export default function Contagem() {
         return;
       }
 
-      // Verificar se a loja já fez contagem
         const { data: contagemData, count } = await supabase
         .from('contagens')
         .select('id', { count: 'exact' })
@@ -177,7 +170,6 @@ export default function Contagem() {
         return;
       }
       
-      // Preparar registros para inserção em batch
       const registros = ativos.map(ativo => ({
         email: userData.email,
         loja: userData.loja,
@@ -187,7 +179,6 @@ export default function Contagem() {
         quantidade: contagem[ativo.id] || 0
       }));
       
-      // Inserir todos os registros de uma vez
       const { error } = await supabase
         .from('contagens')
         .insert(registros);
@@ -196,7 +187,6 @@ export default function Contagem() {
       
       setShowReview(false);
 
-      // Se for um CD e não tiver feito contagem de trânsito ainda, mostrar formulário de trânsito
       if (isCdLocation && countType === "estoque" && !transitoCompleted) {
         setShowTransitoCount(true);
         setIsSubmitting(false);
@@ -240,7 +230,6 @@ export default function Contagem() {
     setTransitoCompleted(true);
   };
 
-  // Se estiver mostrando formulário de trânsito
   if (showTransitoCount) {
     return (
       <div className="relative min-h-screen w-full flex items-center justify-center p-4">
@@ -261,7 +250,6 @@ export default function Contagem() {
     );
   }
 
-  // Função auxiliar para criar a barra de progresso
   const ProgressBar = () => {
     const progress = ((currentStep + 1) / ativos.length) * 100;
     return (
@@ -387,7 +375,6 @@ export default function Contagem() {
         </motion.div>
       </AnimatePresence>
 
-      {/* Modal de revisão de contagem */}
       <Dialog open={showReview} onOpenChange={setShowReview}>
         <DialogContent className="bg-zinc-900 text-white border-zinc-800 max-w-2xl max-h-[90vh] overflow-y-auto rounded-xl">
           <DialogHeader className="pb-2">
@@ -446,7 +433,6 @@ export default function Contagem() {
         </DialogContent>
       </Dialog>
 
-      {/* Modal de seleção de tipo para CD */}
       <SelectCdCountType
         open={showCdTypeModal}
         onOpenChange={setShowCdTypeModal}

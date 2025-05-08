@@ -1,4 +1,4 @@
-// app/api/transito/buscar/route.ts
+
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 
@@ -14,7 +14,6 @@ export async function GET(request: NextRequest) {
       );
     }
     
-    // Buscar contagens de trânsito da loja
     const { data, error } = await supabase
       .from('contagens_transito')
       .select('*')

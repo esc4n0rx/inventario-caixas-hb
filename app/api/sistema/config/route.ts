@@ -1,8 +1,7 @@
-// app/api/sistema/config/route.ts
+
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 
-// Obter todas as configurações do sistema
 export async function GET() {
   try {
     const { data, error } = await supabase
@@ -11,13 +10,11 @@ export async function GET() {
     
     if (error) throw error;
     
-    // Transformar array em objeto
     const config: { [key: string]: string } = {};
     data.forEach(item => {
       config[item.chave] = item.valor;
     });
     
-    // Processar as configurações para formato mais amigável
     const processedConfig = {
       bloqueado: config['sistema_bloqueado'] === 'true',
       modo: config['sistema_modo'] || 'manual',
@@ -40,12 +37,10 @@ export async function GET() {
   }
 }
 
-// Atualizar configurações do sistema
 export async function POST(request: NextRequest) {
   try {
     const { config, senha } = await request.json();
     
-    // Verificação básica de segurança
     if (senha !== process.env.ADMIN_PASSWORD) {
       return NextResponse.json(
         { error: 'Não autorizado' },
@@ -53,7 +48,6 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    // Validar os dados mínimos
     if (config.modo === undefined) {
       return NextResponse.json(
         { error: 'Dados de configuração incompletos' },
@@ -61,10 +55,8 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    // Criar array de operações para atualizar todas as configurações
     const operations = [];
     
-    // Configuração do modo (manual/automático)
     operations.push(
       supabase
         .from('configuracao_sistema')
@@ -75,9 +67,9 @@ export async function POST(request: NextRequest) {
         })
     );
     
-    // Se for modo automático, também atualize as configurações de data/hora
+
     if (config.modo === 'automatico') {
-      // Data de início
+
       if (config.dataInicio) {
         operations.push(
           supabase
@@ -90,7 +82,6 @@ export async function POST(request: NextRequest) {
         );
       }
       
-      // Hora de início
       if (config.horaInicio) {
         operations.push(
           supabase
@@ -103,7 +94,6 @@ export async function POST(request: NextRequest) {
         );
       }
       
-      // Data de fim
       if (config.dataFim) {
         operations.push(
           supabase
@@ -116,7 +106,6 @@ export async function POST(request: NextRequest) {
         );
       }
       
-      // Hora de fim
       if (config.horaFim) {
         operations.push(
           supabase
@@ -129,7 +118,6 @@ export async function POST(request: NextRequest) {
         );
       }
       
-      // Verificar se deve bloquear automaticamente baseado na hora atual
       if (config.dataInicio && config.horaInicio && config.dataFim && config.horaFim) {
         const agora = new Date();
         const dataInicio = new Date(`${config.dataInicio}T${config.horaInicio}`);
@@ -149,7 +137,6 @@ export async function POST(request: NextRequest) {
       }
     }
     
-    // Execute todas as operações
     await Promise.all(operations);
     
     return NextResponse.json({ 
