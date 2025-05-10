@@ -6,6 +6,7 @@ import { ThemeProvider } from "@/components/theme-provider"
 import { Toaster } from "@/components/ui/toaster"
 import MobileBlocker from "@/components/MobileBlocker"
 import SystemStatusChecker from "@/components/SystemStatusChecker"
+import IntegrationProvider from "@/components/IntegrationProvider"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -34,6 +35,7 @@ export default function RootLayout({
           storageKey="inventario-caixas-theme"
         >
           <SystemStatusChecker />
+           <IntegrationProvider />
           
           {children}
           <Toaster />

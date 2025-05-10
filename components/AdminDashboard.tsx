@@ -40,6 +40,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import IntegrationManager, { IntegrationConfig } from "@/components/IntegrationManager";
+import IntegrationLogs from "@/components/IntegrationLogs";
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import {
@@ -114,6 +116,7 @@ export interface AdminDashboardProps {
   onToggleSystem: (state: boolean) => Promise<void>;
   onRemoveContagem: (id: string) => Promise<void>;
   onEditContagem: (id: string, quantidade: number) => Promise<void>;
+  integrationConfig?: IntegrationConfig | null;
 }
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({
@@ -140,6 +143,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [editingContagem, setEditingContagem] = useState<Contagem | null>(null);
   const [showEditDialog, setShowEditDialog] = useState<boolean>(false);
   const [editForm, setEditForm] = useState<{ quantidade: number }>({ quantidade: 0 });
+  const [isIntegrationEnabled, setIsIntegrationEnabled] = useState<boolean>(false);
 
   useEffect(() => {
     if (systemConfig) {
@@ -152,6 +156,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       });
     }
   }, [systemConfig]);
+
 
   const totalLojas = lojas.length;
   const lojasComContagem = new Set(contagensData.map((c) => c.loja)).size;
@@ -270,6 +275,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     const [ano, mes, dia] = dataISO.split('-');
     return `${dia}/${mes}/${ano}`;
   };
+
+  function fetchSystemData(): Promise<void> {
+    throw new Error('Function not implemented.');
+  }
 
   return (
     <div className="flex flex-col w-full">
@@ -724,6 +733,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     </div>
                     <Progress value={progressoInventario} className="h-2 bg-zinc-700" />
                   </div>
+
+                  <IntegrationManager 
+                      systemConfig={systemConfig}
+                      isLoading={isLoading}
+                      onRefresh={fetchSystemData}
+                    />
+                  <IntegrationLogs isIntegrationEnabled={isIntegrationEnabled} />
 
                   {/* Estatísticas */}
                   <div className="grid grid-cols-2 gap-3">
