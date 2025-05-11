@@ -1,15 +1,36 @@
+// app/api/integration/data/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 
 export async function GET(request: NextRequest) {
   try {
+    // Set CORS headers to allow cross-origin requests
+    const response = NextResponse.json(
+      { message: 'Initializing' },
+      { 
+        status: 200,
+        headers: {
+          'Access-Control-Allow-Origin': 'https://hbinventory.vercel.app', // For production, specify the exact origin instead of *
+          'Access-Control-Allow-Methods': 'GET, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        }
+      }
+    );
+
     // Obter o token do cabeçalho Authorization
     const authHeader = request.headers.get('Authorization');
     
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return NextResponse.json(
         { error: 'Token de autenticação não fornecido' },
-        { status: 401 }
+        { 
+          status: 401,
+          headers: {
+            'Access-Control-Allow-Origin': 'https://hbinventory.vercel.app',
+            'Access-Control-Allow-Methods': 'GET, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+          }
+        }
       );
     }
     
@@ -24,21 +45,42 @@ export async function GET(request: NextRequest) {
     if (configError) {
       return NextResponse.json(
         { error: 'Configuração de integração não encontrada' },
-        { status: 500 }
+        { 
+          status: 500,
+          headers: {
+            'Access-Control-Allow-Origin': 'https://hbinventory.vercel.app',
+            'Access-Control-Allow-Methods': 'GET, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+          }
+        }
       );
     }
     
     if (!configData.enabled) {
       return NextResponse.json(
         { error: 'Integração desativada' },
-        { status: 403 }
+        { 
+          status: 403,
+          headers: {
+            'Access-Control-Allow-Origin': 'https://hbinventory.vercel.app',
+            'Access-Control-Allow-Methods': 'GET, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+          }
+        }
       );
     }
     
     if (configData.token !== token) {
       return NextResponse.json(
         { error: 'Token inválido' },
-        { status: 401 }
+        { 
+          status: 401,
+          headers: {
+            'Access-Control-Allow-Origin': 'https://hbinventory.vercel.app',
+            'Access-Control-Allow-Methods': 'GET, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+          }
+        }
       );
     }
     
@@ -49,7 +91,14 @@ export async function GET(request: NextRequest) {
     if (now > expirationDate) {
       return NextResponse.json(
         { error: 'Token expirado' },
-        { status: 401 }
+        { 
+          status: 401,
+          headers: {
+            'Access-Control-Allow-Origin': 'https://hbinventory.vercel.app',
+            'Access-Control-Allow-Methods': 'GET, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+          }
+        }
       );
     }
     
@@ -102,18 +151,50 @@ export async function GET(request: NextRequest) {
     
     if (error) throw error;
     
-    // Formatar resposta
-    return NextResponse.json({
-      success: true,
-      count: data.length,
-      timestamp: new Date().toISOString(),
-      data: data
-    });
+    // Formatar resposta com CORS headers
+    return NextResponse.json(
+      {
+        success: true,
+        count: data.length,
+        timestamp: new Date().toISOString(),
+        data: data
+      },
+      { 
+        headers: {
+          'Access-Control-Allow-Origin': 'https://hbinventory.vercel.app',
+          'Access-Control-Allow-Methods': 'GET, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        }
+      }
+    );
   } catch (error) {
     console.error('Erro ao fornecer dados de integração:', error);
     return NextResponse.json(
       { error: 'Erro ao processar a solicitação' },
-      { status: 500 }
+      { 
+        status: 500,
+        headers: {
+          'Access-Control-Allow-Origin': 'https://hbinventory.vercel.app',
+          'Access-Control-Allow-Methods': 'GET, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        }
+      }
     );
   }
+}
+
+// Handle OPTIONS requests (for CORS preflight)
+export async function OPTIONS(request: NextRequest) {
+  return NextResponse.json(
+    {},
+    {
+      status: 204, // No content
+      headers: {
+        'Access-Control-Allow-Origin': 'https://hbinventory.vercel.app',
+        'Access-Control-Allow-Methods': 'GET, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        'Access-Control-Max-Age': '86400', // 24 hours
+      },
+    }
+  );
 }
