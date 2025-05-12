@@ -1,3 +1,4 @@
+import { lojas } from "@/data/lojas";
 import { type ClassValue, clsx } from "clsx"
 import { twMerge } from "tailwind-merge"
 
@@ -104,3 +105,45 @@ export function verificarHorarioProgramado(
   
   return agora >= inicio && agora <= fim;
 }
+
+/**
++ * Gera um número aleatório inteiro entre min e max (inclusivos)
++ * @param min - Valor mínimo
++ * @param max - Valor máximo
++ * @returns Número aleatório
++ */
+export function gerarNumeroAleatorio(min: number, max: number): number {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+/**
+ * Gera uma data aleatória a partir de uma data de início
+ * @param dataInicio - Data de início (timestamp ou objeto Date)
+ * @returns Data aleatória
+ */
+
+export function gerarDataAleatoria(dataInicio: number | Date): Date {
+  const inicio = typeof dataInicio === "number" ? new Date(dataInicio) : dataInicio;
+  const agora = Date.now();
+  const diff = agora - inicio.getTime();
+  const aleatorio = Math.floor(Math.random() * diff);
+  return new Date(inicio.getTime() + aleatorio);
+}
+
+/**
++ * Gera um e-mail fictício para testes baseado no ID da loja
++ * @param lojaId - ID da loja
++ * @param dominio - Domínio do e-mail (padrão: hortifruti.com.br)
++ * @returns E-mail fictício
++ */
+export function gerarEmailTeste(lojaId: string, dominio: string = "hortifruti.com.br"): string {
+  const prefixos = ["teste", "contagem", "inventario", "admin", "sistema"];
+  const prefixo = prefixos[Math.floor(Math.random() * prefixos.length)];
+  return `${prefixo}.${lojaId}@${dominio}`;
+}
+/**
++ * Retorna o nome da loja a partir do ID
++ */
+export function getNomeLoja(lojaId: string): string {
+  return lojas.find(l => l.id === lojaId)?.nome || `Loja ${lojaId}`;
+ }

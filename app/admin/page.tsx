@@ -16,7 +16,6 @@ import { useToast } from "@/components/ui/use-toast"
 
 import { useStore } from "@/lib/store"
 import { supabase } from '@/lib/supabase'
-import { IntegrationConfig } from "@/components/IntegrationManager";
 import AdminDashboard from "@/components/AdminDashboard"
 
 const formSchema = z.object({
@@ -24,7 +23,6 @@ const formSchema = z.object({
 })
 
 export default function Admin() {
-  const [integrationConfig, setIntegrationConfig] = useState<IntegrationConfig | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [contagensData, setContagensData] = useState<any[]>([])
   const [contagensTransitoData, setContagensTransitoData] = useState<any[]>([])
@@ -72,26 +70,26 @@ export default function Admin() {
       if (configError) throw configError
 
 
-    const { data: integrationData, error: integrationError } = await supabase
-      .from('integracao_config')
-      .select('*')
-      .single();
+    // const { data: integrationData, error: integrationError } = await supabase
+    //   .from('integracao_config')
+    //   .select('*')
+    //   .single();
     
-    if (integrationError) {
-      // Se o erro for que o registro não existe, não é um problema crítico
-      if (integrationError.code !== 'PGRST116') {
-        console.error('Erro ao buscar configuração de integração:', integrationError);
-      }
+    // if (integrationError) {
+    //   // Se o erro for que o registro não existe, não é um problema crítico
+    //   if (integrationError.code !== 'PGRST116') {
+    //     console.error('Erro ao buscar configuração de integração:', integrationError);
+    //   }
       
-      // Definir configuração padrão (desativada)
-      setIntegrationConfig({
-        enabled: false,
-        token: '',
-        expiration: '',
-      });
-    } else {
-      setIntegrationConfig(integrationData);
-    }
+    //   // Definir configuração padrão (desativada)
+    //   setIntegrationConfig({
+    //     enabled: false,
+    //     token: '',
+    //     expiration: '',
+    //   });
+    // } else {
+    //   setIntegrationConfig(integrationData);
+    // }
       
 
       const configMap: { [key: string]: string } = {}
@@ -475,7 +473,6 @@ export default function Admin() {
               onToggleSystem={handleToggleSystem}
               onRemoveContagem={handleRemoveContagem}
               onEditContagem={handleEditContagem}
-              integrationConfig={integrationConfig}
             />
           </div>
         </div>

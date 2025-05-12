@@ -40,8 +40,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import IntegrationManager, { IntegrationConfig } from "@/components/IntegrationManager";
-import IntegrationLogs from "@/components/IntegrationLogs";
+import BatchGenerator from "@/components/BatchGenerator";
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import {
@@ -116,7 +115,6 @@ export interface AdminDashboardProps {
   onToggleSystem: (state: boolean) => Promise<void>;
   onRemoveContagem: (id: string) => Promise<void>;
   onEditContagem: (id: string, quantidade: number) => Promise<void>;
-  integrationConfig?: IntegrationConfig | null;
 }
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({
@@ -345,7 +343,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         <Layers className="h-6 w-6 text-[#F4C95D]" />
                       </div>
                     </div>
-                    <Progress value={progressoInventario} className="mt-3 h-2 bg-zinc-700" />
+                    <Progress value={progressoInventario} className="h-2.5 bg-zinc-700" />
                   </CardContent>
                 </Card>
 
@@ -731,15 +729,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         {progressoInventario.toFixed(1)}%
                       </Badge>
                     </div>
-                    <Progress value={progressoInventario} className="h-2 bg-zinc-700" />
+                    <Progress value={progressoInventario} className="h-2.5 bg-zinc-700" />
                   </div>
 
-                  <IntegrationManager 
-                      systemConfig={systemConfig}
-                      isLoading={isLoading}
-                      onRefresh={fetchSystemData}
+                    <BatchGenerator 
+                      systemConfig={systemConfig as SystemConfig} 
+                      onRefresh={handleRefresh}
                     />
-                  <IntegrationLogs isIntegrationEnabled={isIntegrationEnabled} />
 
                   {/* Estatísticas */}
                   <div className="grid grid-cols-2 gap-3">
