@@ -133,68 +133,114 @@ export function getNomeLoja(lojaId: string): string {
  }
 
 
+// lib/utils.ts (adicionando funções de timezone)
 
+/**
+ * Helper function for system scheduling with São Paulo timezone correction
+ * 
+ * Checks if the current time is within the scheduled time window in São Paulo timezone
+ */
 export function verificarHorarioProgramado(
   dataInicio: string,
   horaInicio: string,
   dataFim: string,
   horaFim: string
 ): boolean {
-  console.log("verificarHorarioProgramado - Parâmetros recebidos:", {
-    dataInicio,
-    horaInicio,
-    dataFim,
-    horaFim
-  });
-  
   if (!dataInicio || !horaInicio || !dataFim || !horaFim) {
-    console.log("verificarHorarioProgramado - Parâmetros incompletos, retornando false");
     return false;
   }
   
   try {
-    const agora = new Date();
-    console.log(`verificarHorarioProgramado - Horário atual: ${agora.toISOString()}`);
+    // Get current time in São Paulo timezone
+    const timezoneSP = 'America/Sao_Paulo';
     
-    // Parse start and end times
+    // Create formatter for SP timezone
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezoneSP,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    });
+    
+    // Get current date in São Paulo timezone
+    const now = new Date();
+    const parts = formatter.formatToParts(now);
+    
+    // Build date object from parts
+    const partValues: Record<string, string> = {};
+    parts.forEach(part => {
+      partValues[part.type] = part.value;
+    });
+    
+    // Create SP time formatted strings
+    const year = partValues.year;
+    const month = partValues.month;
+    const day = partValues.day;
+    const hour = partValues.hour;
+    const minute = partValues.minute;
+    const second = partValues.second;
+    
+    // Create current time in SP timezone
+    const nowSP = new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}`);
+    
+    // Create start and end times
     const inicio = new Date(`${dataInicio}T${horaInicio}`);
     const fim = new Date(`${dataFim}T${horaFim}`);
     
-    console.log(`verificarHorarioProgramado - Início: ${inicio.toISOString()}`);
-    console.log(`verificarHorarioProgramado - Fim: ${fim.toISOString()}`);
+    // Debug logging
+    console.log(`Verificando horário: 
+      • Agora em SP: ${nowSP.toISOString()}
+      • Início: ${inicio.toISOString()}
+      • Fim: ${fim.toISOString()}`);
     
-    // Check for valid dates
-    if (isNaN(inicio.getTime())) {
-      console.error(`verificarHorarioProgramado - Data de início inválida: ${dataInicio}T${horaInicio}`);
-      return false;
-    }
-    
-    if (isNaN(fim.getTime())) {
-      console.error(`verificarHorarioProgramado - Data de fim inválida: ${dataFim}T${horaFim}`);
-      return false;
-    }
-    
-    // Current time is within the range if it's after or equal to start
-    // and before or equal to end
-    const agoraTimestamp = agora.getTime();
-    const inicioTimestamp = inicio.getTime();
-    const fimTimestamp = fim.getTime();
-    
-    console.log(`verificarHorarioProgramado - Timestamp atual: ${agoraTimestamp}`);
-    console.log(`verificarHorarioProgramado - Timestamp início: ${inicioTimestamp}`);
-    console.log(`verificarHorarioProgramado - Timestamp fim: ${fimTimestamp}`);
-    
-    const maiorQueInicio = agoraTimestamp >= inicioTimestamp;
-    const menorQueFim = agoraTimestamp <= fimTimestamp;
-    const isWithinRange = maiorQueInicio && menorQueFim;
-    
-    console.log(`verificarHorarioProgramado - É maior que início? ${maiorQueInicio}`);
-    console.log(`verificarHorarioProgramado - É menor que fim? ${menorQueFim}`);
-    console.log(`verificarHorarioProgramado - Está dentro do intervalo? ${isWithinRange}`);
-    
-    return isWithinRange;
+    // Current time is within the range if it's greater than or equal to start
+    // and less than or equal to end
+    return nowSP >= inicio && nowSP <= fim;
   } catch (error) {
-    console.error('verificarHorarioProgramado - Erro ao verificar horário:', error);
+    console.error('Erro ao verificar horário programado:', error);
     return false; // In case of any date parsing errors, return false
   }
+}
+
+/**
+ * Get current date and time in São Paulo timezone
+ * Returns a date object representing the current time in SP timezone
+ */
+export function getCurrentDateInSaoPauloTZ(): Date {
+  // Create a date formatter for São Paulo timezone
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Sao_Paulo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  });
+  
+  // Get current date
+  const now = new Date();
+  const parts = formatter.formatToParts(now);
+  
+  // Build date object from parts
+  const partValues: Record<string, string> = {};
+  parts.forEach(part => {
+    partValues[part.type] = part.value;
+  });
+  
+  // Create SP time formatted strings
+  const year = partValues.year;
+  const month = partValues.month;
+  const day = partValues.day;
+  const hour = partValues.hour;
+  const minute = partValues.minute;
+  const second = partValues.second;
+  
+  // Create and return date object in SP timezone
+  return new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}`);
 }
