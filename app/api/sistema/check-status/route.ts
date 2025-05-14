@@ -1,3 +1,4 @@
+// Fixed version of app/api/sistema/check-status/route.ts
 
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
@@ -16,6 +17,7 @@ export async function GET() {
       config[item.chave] = item.valor;
     });
     
+    // If not in automatic mode, no action needed
     if (config['sistema_modo'] !== 'automatico') {
       return NextResponse.json({ 
         success: true, 
@@ -24,6 +26,7 @@ export async function GET() {
       });
     }
     
+    // Check if current time is within the scheduled window
     const dentroDoHorario = verificarHorarioProgramado(
       config['data_inicio'],
       config['hora_inicio'],
@@ -31,11 +34,13 @@ export async function GET() {
       config['hora_fim']
     );
     
+    // System should be blocked if NOT within the scheduled window
     const deveBloqueado = !dentroDoHorario;
     
-
+    // Get current system status
     const statusAtual = config['sistema_bloqueado'] === 'true';
     
+    // If current status doesn't match what it should be, update it
     if (statusAtual !== deveBloqueado) {
       const { error: updateError } = await supabase
         .from('configuracao_sistema')
@@ -61,6 +66,7 @@ export async function GET() {
       });
     }
     
+    // Status is already correct, no action needed
     return NextResponse.json({ 
       success: true, 
       message: 'Status já está correto, nenhuma ação necessária',

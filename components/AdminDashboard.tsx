@@ -67,7 +67,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
-
+import CleanupCard from "@/components/CleanupCard" 
+import SystemMaintenanceCard from "@/components/SystemMaintenanceCard";
 import { formatarData } from '@/lib/utils';
 import { lojas } from '@/data/lojas';
 import { ativos } from '@/data/ativos';
@@ -623,6 +624,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           Configurar
                         </Button>
                       </div>
+
+                      <SystemMaintenanceCard 
+                        systemConfig={systemConfig} 
+                        contagensData={contagensData}
+                        onRefresh={onRefresh}
+                      />
 
                       {systemConfig?.dataInicio ? (
                         <div className="space-y-2 text-sm">

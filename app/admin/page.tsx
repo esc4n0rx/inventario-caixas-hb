@@ -18,6 +18,7 @@ import { useStore } from "@/lib/store"
 import { supabase } from '@/lib/supabase'
 import AdminDashboard from "@/components/AdminDashboard"
 
+
 const formSchema = z.object({
   password: z.string().min(1, "Senha é obrigatória"),
 })

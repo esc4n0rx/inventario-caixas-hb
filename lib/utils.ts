@@ -89,22 +89,6 @@ export function calcularMediaPorHora(contagens: any[], horasAtras: number = 24):
  * @param horaFim - Hora de fim (HH:MM)
  * @returns true se o horário atual está dentro do período
  */
-export function verificarHorarioProgramado(
-  dataInicio: string,
-  horaInicio: string,
-  dataFim: string,
-  horaFim: string
-): boolean {
-  if (!dataInicio || !horaInicio || !dataFim || !horaFim) {
-    return false;
-  }
-  
-  const agora = new Date();
-  const inicio = new Date(`${dataInicio}T${horaInicio}`);
-  const fim = new Date(`${dataFim}T${horaFim}`);
-  
-  return agora >= inicio && agora <= fim;
-}
 
 /**
 + * Gera um número aleatório inteiro entre min e max (inclusivos)
@@ -147,3 +131,123 @@ export function gerarEmailTeste(lojaId: string, dominio: string = "hortifruti.co
 export function getNomeLoja(lojaId: string): string {
   return lojas.find(l => l.id === lojaId)?.nome || `Loja ${lojaId}`;
  }
+
+
+ /**
+ * Helper function for system scheduling
+ * 
+ * Checks if the current time is within the scheduled time window
+ * Fixed version of verificarHorarioProgramado that correctly handles date and time comparison
+ */
+export function verificarHorarioProgramado(
+  dataInicio: string,
+  horaInicio: string,
+  dataFim: string,
+  horaFim: string
+): boolean {
+  if (!dataInicio || !horaInicio || !dataFim || !horaFim) {
+    return false;
+  }
+  
+  try {
+    const agora = new Date();
+    const inicio = new Date(`${dataInicio}T${horaInicio}`);
+    const fim = new Date(`${dataFim}T${horaFim}`);
+    
+    // Current time is within the range if it's greater than or equal to start
+    // and less than or equal to end
+    return agora >= inicio && agora <= fim;
+  } catch (error) {
+    console.error('Erro ao verificar horário programado:', error);
+    return false; // In case of any date parsing errors, return false
+  }
+}
+
+/**
+ * Check if system should be automatically blocked or unblocked based on schedule
+ * 
+ * This function is used by system status checker to periodically update system state
+ */
+export async function verificarEAtualizarBloqueioAutomatico(supabase: any) {
+  try {
+    // Get current system configuration
+    const { data, error } = await supabase
+      .from('configuracao_sistema')
+      .select('*');
+    
+    if (error) throw error;
+    
+    // Convert array of config items to a simple object
+    const config: { [key: string]: string } = {};
+    data.forEach((item: { chave: string; valor: string }) => {
+      config[item.chave] = item.valor;
+    });
+    
+    // If system is not in automatic mode, do nothing
+    if (config['sistema_modo'] !== 'automatico') {
+      return {
+        success: true,
+        message: 'Sistema em modo manual, nenhuma ação tomada',
+        status: 'manual'
+      };
+    }
+    
+    // Check if current time is within the scheduled window
+    const dentroDoHorario = verificarHorarioProgramado(
+      config['data_inicio'],
+      config['hora_inicio'],
+      config['data_fim'],
+      config['hora_fim']
+    );
+    
+    // Should be blocked if NOT within the scheduled window
+    const deveBloqueado = !dentroDoHorario;
+    const statusAtual = config['sistema_bloqueado'] === 'true';
+    
+    // If current status doesn't match what it should be, update it
+    if (statusAtual !== deveBloqueado) {
+      const { error: updateError } = await supabase
+        .from('configuracao_sistema')
+        .update({ 
+          valor: deveBloqueado.toString(),
+          data_modificacao: new Date().toISOString()
+        })
+        .eq('chave', 'sistema_bloqueado');
+      
+      if (updateError) throw updateError;
+      
+      return { 
+        success: true, 
+        message: `Sistema ${deveBloqueado ? 'bloqueado' : 'desbloqueado'} automaticamente`,
+        status: deveBloqueado ? 'blocked' : 'unblocked',
+        schedule: {
+          dataInicio: config['data_inicio'],
+          horaInicio: config['hora_inicio'],
+          dataFim: config['data_fim'],
+          horaFim: config['hora_fim'],
+          dentroDoHorario
+        }
+      };
+    }
+    
+    // Status is already correct, no need to update
+    return { 
+      success: true, 
+      message: 'Status já está correto, nenhuma ação necessária',
+      status: deveBloqueado ? 'blocked' : 'unblocked',
+      schedule: {
+        dataInicio: config['data_inicio'],
+        horaInicio: config['hora_inicio'],
+        dataFim: config['data_fim'],
+        horaFim: config['hora_fim'],
+        dentroDoHorario
+      }
+    };
+  } catch (error) {
+    console.error('Erro ao verificar e atualizar status do sistema:', error);
+    return { 
+      success: false,
+      error: 'Erro ao verificar e atualizar status do sistema'
+    };
+  }
+}

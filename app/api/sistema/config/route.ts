@@ -1,6 +1,8 @@
+// Fixed version of app/api/sistema/config/route.ts
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { verificarHorarioProgramado } from '@/lib/utils';
 
 export async function GET() {
   try {
@@ -57,6 +59,7 @@ export async function POST(request: NextRequest) {
     
     const operations = [];
     
+    // First, update the mode
     operations.push(
       supabase
         .from('configuracao_sistema')
@@ -67,9 +70,8 @@ export async function POST(request: NextRequest) {
         })
     );
     
-
+    // If automatic mode, update schedule details and check if system should be blocked
     if (config.modo === 'automatico') {
-
       if (config.dataInicio) {
         operations.push(
           supabase
@@ -118,12 +120,18 @@ export async function POST(request: NextRequest) {
         );
       }
       
+      // If all schedule parameters are provided, update system blocked state
       if (config.dataInicio && config.horaInicio && config.dataFim && config.horaFim) {
-        const agora = new Date();
-        const dataInicio = new Date(`${config.dataInicio}T${config.horaInicio}`);
-        const dataFim = new Date(`${config.dataFim}T${config.horaFim}`);
+        // Check if current time is within schedule
+        const dentroDoHorario = verificarHorarioProgramado(
+          config.dataInicio,
+          config.horaInicio,
+          config.dataFim,
+          config.horaFim
+        );
         
-        const deveBloqueado = !(agora >= dataInicio && agora <= dataFim);
+        // System should be blocked if NOT within the scheduled window
+        const deveBloqueado = !dentroDoHorario;
         
         operations.push(
           supabase
@@ -137,6 +145,7 @@ export async function POST(request: NextRequest) {
       }
     }
     
+    // Execute all database operations
     await Promise.all(operations);
     
     return NextResponse.json({ 
