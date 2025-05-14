@@ -18,7 +18,7 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  Tooltip,
+  Tooltip as RechartsTooltip,
   ResponsiveContainer,
   LineChart,
   Line,
@@ -26,8 +26,6 @@ import {
   Pie,
   Cell,
 } from 'recharts';
-import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
 
 import {
   Card,
@@ -67,7 +65,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
-import CleanupCard from "@/components/CleanupCard" 
+import { toast } from '@/components/ui/use-toast';
+import CleanupCard from "@/components/CleanupCard";
 import SystemMaintenanceCard from "@/components/SystemMaintenanceCard";
 import { formatarData } from '@/lib/utils';
 import { lojas } from '@/data/lojas';
@@ -118,6 +117,157 @@ export interface AdminDashboardProps {
   onEditContagem: (id: string, quantidade: number) => Promise<void>;
 }
 
+// Schedule Config Dialog Component
+function ScheduleConfigDialog({
+  open,
+  onOpenChange,
+  initialConfig,
+  onSave
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  initialConfig: ScheduleForm;
+  onSave: (config: ScheduleForm) => Promise<void>;
+}) {
+  const [formData, setFormData] = useState({
+    modo: initialConfig.modo || 'automatico',
+    dataInicio: initialConfig.dataInicio || '',
+    horaInicio: initialConfig.horaInicio || '',
+    dataFim: initialConfig.dataFim || '',
+    horaFim: initialConfig.horaFim || '',
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Update form when initialConfig changes
+  useEffect(() => {
+    if (open) {
+      setFormData({
+        modo: initialConfig.modo || 'automatico',
+        dataInicio: initialConfig.dataInicio || '',
+        horaInicio: initialConfig.horaInicio || '',
+        dataFim: initialConfig.dataFim || '',
+        horaFim: initialConfig.horaFim || '',
+      });
+    }
+  }, [initialConfig, open]);
+
+  const handleChange = (field: string, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleSubmit = async () => {
+    // Validate form fields
+    if (!formData.dataInicio || !formData.horaInicio || !formData.dataFim || !formData.horaFim) {
+      toast({
+        title: "Campos incompletos",
+        description: "Todos os campos são obrigatórios. Por favor, preencha todos os campos.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await onSave(formData);
+      onOpenChange(false);
+      console.log("Configuração salva com sucesso:", formData);
+    } catch (error) {
+      console.error("Erro ao salvar configuração:", error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível salvar a configuração. Por favor, tente novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="bg-zinc-900 text-white border-zinc-800 max-w-md">
+        <DialogHeader>
+          <DialogTitle>Configurar Horário</DialogTitle>
+          <DialogDescription className="text-zinc-400">
+            Configure o período em que o sistema estará disponível para contagens
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Data de Início</Label>
+              <div className="relative">
+                <Input
+                  type="date"
+                  value={formData.dataInicio}
+                  onChange={(e) => handleChange('dataInicio', e.target.value)}
+                  className="bg-zinc-800 border-zinc-700 pl-10"
+                />
+                <Calendar className="absolute left-3 top-2.5 h-5 w-5 text-zinc-500" />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Hora de Início</Label>
+              <div className="relative">
+                <Input
+                  type="time"
+                  value={formData.horaInicio}
+                  onChange={(e) => handleChange('horaInicio', e.target.value)}
+                  className="bg-zinc-800 border-zinc-700 pl-10"
+                />
+                <Clock3 className="absolute left-3 top-2.5 h-5 w-5 text-zinc-500" />
+              </div>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Data de Término</Label>
+              <div className="relative">
+                <Input
+                  type="date"
+                  value={formData.dataFim}
+                  onChange={(e) => handleChange('dataFim', e.target.value)}
+                  className="bg-zinc-800 border-zinc-700 pl-10"
+                />
+                <Calendar className="absolute left-3 top-2.5 h-5 w-5 text-zinc-500" />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Hora de Término</Label>
+              <div className="relative">
+                <Input
+                  type="time"
+                  value={formData.horaFim}
+                  onChange={(e) => handleChange('horaFim', e.target.value)}
+                  className="bg-zinc-800 border-zinc-700 pl-10"
+                />
+                <Clock3 className="absolute left-3 top-2.5 h-5 w-5 text-zinc-500" />
+              </div>
+            </div>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={isSubmitting}
+            className="border-zinc-700 text-white hover:bg-zinc-800"
+          >
+            Cancelar
+          </Button>
+          <Button
+            onClick={handleSubmit}
+            disabled={isSubmitting}
+            className="bg-[#F4C95D] hover:bg-[#e5bb4e] text-black"
+          >
+            {isSubmitting ? "Salvando..." : "Salvar"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 const AdminDashboard: React.FC<AdminDashboardProps> = ({
   contagensData,
   contagensTransitoData,
@@ -142,8 +292,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [editingContagem, setEditingContagem] = useState<Contagem | null>(null);
   const [showEditDialog, setShowEditDialog] = useState<boolean>(false);
   const [editForm, setEditForm] = useState<{ quantidade: number }>({ quantidade: 0 });
-  const [isIntegrationEnabled, setIsIntegrationEnabled] = useState<boolean>(false);
 
+  // Update scheduleForm when systemConfig changes
   useEffect(() => {
     if (systemConfig) {
       setScheduleForm({
@@ -155,7 +305,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       });
     }
   }, [systemConfig]);
-
 
   const totalLojas = lojas.length;
   const lojasComContagem = new Set(contagensData.map((c) => c.loja)).size;
@@ -180,27 +329,70 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   };
 
-  const handleSaveSchedule = async (): Promise<void> => {
-    await onUpdateSchedule({
-      modo: scheduleForm.modo,
-      dataInicio: scheduleForm.dataInicio,
-      horaInicio: scheduleForm.horaInicio,
-      dataFim: scheduleForm.dataFim,
-      horaFim: scheduleForm.horaFim
-    });
-    setShowScheduleDialog(false);
+  // Improved function to save schedule
+  const handleSaveSchedule = async (formData: ScheduleForm): Promise<void> => {
+    console.log("Saving schedule with data:", formData);
+    
+    try {
+      // Make a direct API call to the config endpoint
+      const response = await fetch('/api/sistema/config', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          config: formData,
+          senha: localStorage.getItem('admin_password') || ''
+        }),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Erro ao atualizar configurações');
+      }
+      
+      const data = await response.json();
+      console.log("Update response:", data);
+      
+      // Call the parent component's update function to refresh state
+      await onUpdateSchedule(formData);
+      
+      toast({
+        title: "Horário configurado",
+        description: "As configurações de horário foram salvas com sucesso.",
+      });
+      
+      // Refresh data to reflect changes
+      await onRefresh();
+      
+    } catch (error) {
+      console.error("Erro ao salvar configurações:", error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível salvar as configurações de horário.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleModeChange = (value: boolean) => {
     const newMode = value ? 'automatico' : 'manual';
-    setScheduleForm({
-      ...scheduleForm,
-      modo: newMode
-    });
     
-    if (value && (!systemConfig?.dataInicio || !systemConfig?.horaInicio)) {
-      setShowScheduleDialog(true);
+    setScheduleForm(prev => ({
+      ...prev,
+      modo: newMode
+    }));
+    
+    if (value) {
+      // If changing to automatic mode and schedule not set, show dialog
+      if (!systemConfig?.dataInicio || !systemConfig?.horaInicio) {
+        setShowScheduleDialog(true);
+      } else {
+        // If schedule is already set, just update the mode
+        onUpdateSchedule({ modo: newMode });
+      }
     } else {
+      // If changing to manual mode, just update that
       onUpdateSchedule({ modo: newMode });
     }
   };
@@ -261,10 +453,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const verificarHorarioProgramado = (): boolean => {
     if (!systemConfig || !systemConfig.dataInicio || !systemConfig.dataFim) return false;
-    const now = new Date();
-    const inicio = new Date(`${systemConfig.dataInicio}T${systemConfig.horaInicio}`);
-    const fim = new Date(`${systemConfig.dataFim}T${systemConfig.horaFim}`);
-    return now >= inicio && now <= fim;
+    try {
+      const now = new Date();
+      const inicio = new Date(`${systemConfig.dataInicio}T${systemConfig.horaInicio}`);
+      const fim = new Date(`${systemConfig.dataFim}T${systemConfig.horaFim}`);
+      return now >= inicio && now <= fim;
+    } catch (error) {
+      console.error('Erro ao verificar horário:', error);
+      return false;
+    }
   };
 
   const dentroDoHorario = verificarHorarioProgramado();
@@ -274,10 +471,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     const [ano, mes, dia] = dataISO.split('-');
     return `${dia}/${mes}/${ano}`;
   };
-
-  function fetchSystemData(): Promise<void> {
-    throw new Error('Function not implemented.');
-  }
 
   return (
     <div className="flex flex-col w-full">
@@ -481,7 +674,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             width={80}
                             tick={{ fontSize: 11 }}
                           />
-                          <Tooltip 
+                          <RechartsTooltip 
                             contentStyle={{ 
                               backgroundColor: '#333', 
                               border: '1px solid #555',
@@ -515,7 +708,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             tickFormatter={(value) => `${value}h`} 
                           />
                           <YAxis stroke="#888" />
-                          <Tooltip 
+                          <RechartsTooltip 
                             contentStyle={{ 
                               backgroundColor: '#333', 
                               border: '1px solid #555',
@@ -565,7 +758,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                           ))}
                         </Pie>
-                        <Tooltip 
+                        <RechartsTooltip 
                           contentStyle={{ 
                             backgroundColor: '#333', 
                             border: '1px solid #555',
@@ -625,12 +818,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         </Button>
                       </div>
 
-                      <SystemMaintenanceCard 
-                        systemConfig={systemConfig} 
-                        contagensData={contagensData}
-                        onRefresh={onRefresh}
-                      />
-
                       {systemConfig?.dataInicio ? (
                         <div className="space-y-2 text-sm">
                           <div className="flex justify-between bg-zinc-700/20 p-3 rounded-md">
@@ -648,6 +835,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           <div className="flex justify-between bg-zinc-700/20 p-3 rounded-md">
                             <span className="text-zinc-400">Hora Fim:</span>
                             <span>{systemConfig.horaFim}</span>
+                          </div>
+                          <div className="flex justify-between bg-zinc-700/20 p-3 rounded-md">
+                            <span className="text-zinc-400">Status Atual:</span>
+                            <span className={dentroDoHorario ? "text-green-400" : "text-amber-400"}>
+                              {dentroDoHorario ? "Dentro do horário" : "Fora do horário"}
+                            </span>
                           </div>
                         </div>
                       ) : (
@@ -739,10 +932,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <Progress value={progressoInventario} className="h-2.5 bg-zinc-700" />
                   </div>
 
-                    <BatchGenerator 
-                      systemConfig={systemConfig as SystemConfig} 
-                      onRefresh={handleRefresh}
-                    />
+                  <BatchGenerator 
+                    systemConfig={systemConfig} 
+                    onRefresh={handleRefresh}
+                  />
 
                   {/* Estatísticas */}
                   <div className="grid grid-cols-2 gap-3">
@@ -762,6 +955,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
               </CardContent>
             </Card>
+            
+            {/* System Maintenance Card */}
+            <SystemMaintenanceCard 
+              systemConfig={systemConfig} 
+              contagensData={contagensData}
+              onRefresh={onRefresh}
+            />
           </div>
         </TabsContent>
 
@@ -953,74 +1153,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </TabsContent>
       </Tabs>
 
-      {/* Diálogo de Configuração de Horário */}
-      <Dialog open={showScheduleDialog} onOpenChange={setShowScheduleDialog}>
-        <DialogContent className="bg-zinc-900 text-white border-zinc-800 max-w-md">
-          <DialogHeader>
-            <DialogTitle>Configurar Horário</DialogTitle>
-            <DialogDescription className="text-zinc-400">
-              Configure o período em que o sistema estará disponível para contagens
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Data de Início</Label>
-                <Input
-                  type="date"
-                  value={scheduleForm.dataInicio}
-                  onChange={(e) => setScheduleForm({...scheduleForm, dataInicio: e.target.value})}
-                  className="bg-zinc-800 border-zinc-700"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Hora de Início</Label>
-                <Input
-                  type="time"
-                  value={scheduleForm.horaInicio}
-                  onChange={(e) => setScheduleForm({...scheduleForm, horaInicio: e.target.value})}
-                  className="bg-zinc-800 border-zinc-700"
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Data de Término</Label>
-                <Input
-                  type="date"
-                  value={scheduleForm.dataFim}
-                  onChange={(e) => setScheduleForm({...scheduleForm, dataFim: e.target.value})}
-                  className="bg-zinc-800 border-zinc-700"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Hora de Término</Label>
-                <Input
-                  type="time"
-                  value={scheduleForm.horaFim}
-                  onChange={(e) => setScheduleForm({...scheduleForm, horaFim: e.target.value})}
-                  className="bg-zinc-800 border-zinc-700"
-                />
-              </div>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setShowScheduleDialog(false)}
-              className="border-zinc-700 text-white hover:bg-zinc-800"
-            >
-              Cancelar
-            </Button>
-            <Button
-              onClick={handleSaveSchedule}
-              className="bg-[#F4C95D] hover:bg-[#e5bb4e] text-black"
-            >
-              Salvar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Using the new ScheduleConfigDialog component */}
+      <ScheduleConfigDialog
+        open={showScheduleDialog}
+        onOpenChange={setShowScheduleDialog}
+        initialConfig={scheduleForm}
+        onSave={handleSaveSchedule}
+      />
 
       {/* Diálogo de Edição de Contagem */}
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>

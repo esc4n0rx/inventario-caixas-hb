@@ -171,115 +171,96 @@ export default function Admin() {
   }
 
 
-  const onSubmit = async (values: z.infer<typeof formSchema>) => {
-    try {
-      const response = await fetch('/api/admin/verificar', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ senha: values.password }),
-      })
+  // In app/admin/page.tsx
+
+const onSubmit = async (values: z.infer<typeof formSchema>) => {
+  try {
+    const response = await fetch('/api/admin/verificar', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ senha: values.password }),
+    });
+    
+    const data = await response.json();
+    
+    if (data.autorizado) {
+      // Store password for API calls (will be used in handleUpdateSchedule)
+      localStorage.setItem('admin_password', values.password);
       
-      const data = await response.json()
-      
-      if (data.autorizado) {
-        setIsAuthenticated(true)
-        toast({
-          title: "Autenticado com sucesso",
-          description: "Bem-vindo à área administrativa",
-        })
-      } else {
-        toast({
-          title: "Senha incorreta",
-          description: "Por favor, tente novamente",
-          variant: "destructive",
-        })
-      }
-    } catch (error) {
-      console.error('Erro ao verificar senha:', error)
+      setIsAuthenticated(true);
       toast({
-        title: "Erro de autenticação",
-        description: "Ocorreu um erro ao verificar a senha. Tente novamente.",
+        title: "Autenticado com sucesso",
+        description: "Bem-vindo à área administrativa",
+      });
+    } else {
+      toast({
+        title: "Senha incorreta",
+        description: "Por favor, tente novamente",
         variant: "destructive",
-      })
+      });
     }
+  } catch (error) {
+    console.error('Erro ao verificar senha:', error);
+    toast({
+      title: "Erro de autenticação",
+      description: "Ocorreu um erro ao verificar a senha. Tente novamente.",
+      variant: "destructive",
+    });
   }
+}
 
-
-  const handleUpdateSchedule = async (scheduleData:any) => {
-    try {
-
-      await supabase
-        .from('configuracao_sistema')
-        .upsert({ 
-          chave: 'sistema_modo', 
-          valor: scheduleData.modo,
-          data_modificacao: new Date().toISOString() 
-        })
-      
-      if (scheduleData.modo === 'automatico') {
-
-        await supabase
-          .from('configuracao_sistema')
-          .upsert({ 
-            chave: 'data_inicio', 
-            valor: scheduleData.dataInicio,
-            data_modificacao: new Date().toISOString() 
-          })
-        
-        await supabase
-          .from('configuracao_sistema')
-          .upsert({ 
-            chave: 'hora_inicio', 
-            valor: scheduleData.horaInicio,
-            data_modificacao: new Date().toISOString() 
-          })
-        
-        await supabase
-          .from('configuracao_sistema')
-          .upsert({ 
-            chave: 'data_fim', 
-            valor: scheduleData.dataFim,
-            data_modificacao: new Date().toISOString() 
-          })
-        
-
-        await supabase
-          .from('configuracao_sistema')
-          .upsert({ 
-            chave: 'hora_fim', 
-            valor: scheduleData.horaFim,
-            data_modificacao: new Date().toISOString() 
-          })
-      }
-      
-      if (scheduleData.modo === 'automatico') {
-        const agora = new Date()
-        const dataInicio = new Date(`${scheduleData.dataInicio}T${scheduleData.horaInicio}`)
-        const dataFim = new Date(`${scheduleData.dataFim}T${scheduleData.horaFim}`)
-        
-        const deveBloqueado = !(agora >= dataInicio && agora <= dataFim)
-        
-        await handleToggleSystem(!deveBloqueado, false) 
-      }
-      
-      toast({
-        title: "Configurações salvas",
-        description: "As configurações de agendamento foram atualizadas com sucesso",
-      })
-      
-
-      await fetchSystemData()
-    } catch (error) {
-      console.error('Erro ao atualizar configurações:', error)
-      toast({
-        title: "Erro",
-        description: "Não foi possível atualizar as configurações de agendamento",
-        variant: "destructive",
-      })
+  const handleUpdateSchedule = async (scheduleData: any) => {
+  try {
+    console.log("Updating schedule with data:", scheduleData);
+    
+    // Make a direct API call to the config endpoint
+    const response = await fetch('/api/sistema/config', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        config: scheduleData,
+        senha: localStorage.getItem('admin_password') || '' // The password should be stored when admin logs in
+      }),
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Erro ao atualizar configurações');
     }
+    
+    const data = await response.json();
+    console.log("Update response:", data);
+    
+    // Update the local state
+    setSystemConfig(prev => {
+      if (!prev) return scheduleData;
+      return { ...prev, ...scheduleData };
+    });
+    
+    // If automatic mode, check if system should be blocked or unblocked
+    if (scheduleData.modo === 'automatico') {
+      // This refreshes the data which should check the scheduling
+      await fetchSystemData();
+    }
+    
+    toast({
+      title: "Configurações salvas",
+      description: "As configurações de agendamento foram atualizadas com sucesso",
+    });
+  } catch (error) {
+    console.error('Erro ao atualizar configurações:', error);
+    toast({
+      title: "Erro",
+      description: "Não foi possível atualizar as configurações de agendamento",
+      variant: "destructive",
+    });
   }
+}
+  
 
 
   const handleToggleSystem = async (ativar:any, showToast = true) => {
