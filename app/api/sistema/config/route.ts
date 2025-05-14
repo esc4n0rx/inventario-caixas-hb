@@ -122,7 +122,11 @@ export async function POST(request: NextRequest) {
       
       // If all schedule parameters are provided, update system blocked state
       if (config.dataInicio && config.horaInicio && config.dataFim && config.horaFim) {
+        // Get current SP time for logging
+        const spTime = getCurrentDateInSaoPauloTZ();
+        
         console.log("[API Config] Verificando horário programado com timezone SP");
+        console.log(`[API Config] Horário atual SP: ${spTime.formatted}`);
         
         // Check if current time is within schedule using São Paulo timezone
         const dentroDoHorario = verificarHorarioProgramado(
@@ -132,7 +136,6 @@ export async function POST(request: NextRequest) {
           config.horaFim
         );
         
-        console.log(`[API Config] Horário atual SP: ${getCurrentDateInSaoPauloTZ().toISOString()}`);
         console.log(`[API Config] Dentro do horário: ${dentroDoHorario}`);
         
         // System should be blocked if NOT within the scheduled window

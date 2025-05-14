@@ -132,14 +132,7 @@ export function getNomeLoja(lojaId: string): string {
   return lojas.find(l => l.id === lojaId)?.nome || `Loja ${lojaId}`;
  }
 
-
-// lib/utils.ts (adicionando funções de timezone)
-
-/**
- * Helper function for system scheduling with São Paulo timezone correction
- * 
- * Checks if the current time is within the scheduled time window in São Paulo timezone
- */
+// lib/utils.js
 export function verificarHorarioProgramado(
   dataInicio: string,
   horaInicio: string,
@@ -149,98 +142,50 @@ export function verificarHorarioProgramado(
   if (!dataInicio || !horaInicio || !dataFim || !horaFim) {
     return false;
   }
-  
-  try {
-    // Get current time in São Paulo timezone
-    const timezoneSP = 'America/Sao_Paulo';
-    
-    // Create formatter for SP timezone
-    const formatter = new Intl.DateTimeFormat('en-US', {
-      timeZone: timezoneSP,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: false
-    });
-    
-    // Get current date in São Paulo timezone
-    const now = new Date();
-    const parts = formatter.formatToParts(now);
-    
-    // Build date object from parts
-    const partValues: Record<string, string> = {};
-    parts.forEach(part => {
-      partValues[part.type] = part.value;
-    });
-    
-    // Create SP time formatted strings
-    const year = partValues.year;
-    const month = partValues.month;
-    const day = partValues.day;
-    const hour = partValues.hour;
-    const minute = partValues.minute;
-    const second = partValues.second;
-    
-    // Create current time in SP timezone
-    const nowSP = new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}`);
-    
-    // Create start and end times
-    const inicio = new Date(`${dataInicio}T${horaInicio}`);
-    const fim = new Date(`${dataFim}T${horaFim}`);
-    
-    // Debug logging
-    console.log(`Verificando horário: 
-      • Agora em SP: ${nowSP.toISOString()}
-      • Início: ${inicio.toISOString()}
-      • Fim: ${fim.toISOString()}`);
-    
-    // Current time is within the range if it's greater than or equal to start
-    // and less than or equal to end
-    return nowSP >= inicio && nowSP <= fim;
-  } catch (error) {
-    console.error('Erro ao verificar horário programado:', error);
-    return false; // In case of any date parsing errors, return false
-  }
+  const saoPauloOffset = '-03:00'; // CUIDADO: Isso pode mudar com horário de verão (embora não mais em SP)
+                                  // Uma biblioteca lida com isso dinamicamente.
+
+  const agoraUtcDate = new Date(); // Horário atual UTC
+
+  // Construir strings ISO para início e fim com o offset de SP
+  // Isso informa ao construtor Date que a data/hora fornecida é de SP
+  const inicioSaoPauloISO = `${dataInicio}T${horaInicio}:00.000${saoPauloOffset}`;
+  const fimSaoPauloISO = `${dataFim}T${horaFim}:00.000${saoPauloOffset}`;
+
+  // Criar objetos Date. Eles serão internamente UTC, representando o momento correto.
+  const inicioProgramadoUtcEquivDate = new Date(inicioSaoPauloISO);
+  const fimProgramadoUtcEquivDate = new Date(fimSaoPauloISO);
+
+  console.log(`Verificando horário programado (utils):`);
+  console.log(`• Horário atual UTC: ${agoraUtcDate.toISOString()}`);
+  console.log(`• Início programado (interpretado como SP, equivalente UTC): ${inicioProgramadoUtcEquivDate.toISOString()}`); // Ex: 2025-05-14T18:00:00.000Z
+  console.log(`• Fim programado (interpretado como SP, equivalente UTC): ${fimProgramadoUtcEquivDate.toISOString()}`);     // Ex: 2025-05-14T19:00:00.000Z
+
+  const agoraTimestamp = agoraUtcDate.getTime();
+  const inicioTimestamp = inicioProgramadoUtcEquivDate.getTime();
+  const fimTimestamp = fimProgramadoUtcEquivDate.getTime();
+
+  // Verifica se o horário atual está dentro do intervalo [início, fim)
+  const estaDentro = agoraTimestamp >= inicioTimestamp && agoraTimestamp < fimTimestamp;
+
+  console.log(`• Comparando (Timestamps UTC): <span class="math-inline">\{agoraTimestamp\} \(</span>{agoraUtcDate.toISOString()}) está entre <span class="math-inline">\{inicioTimestamp\} \(</span>{inicioProgramadoUtcEquivDate.toISOString()}) e <span class="math-inline">\{fimTimestamp\} \(</span>{fimProgramadoUtcEquivDate.toISOString()})`);
+  console.log(`• Resultado: ${estaDentro ? 'Dentro do horário' : 'Fora do horário'}`);
+
+  return estaDentro;
 }
 
-/**
- * Get current date and time in São Paulo timezone
- * Returns a date object representing the current time in SP timezone
- */
-export function getCurrentDateInSaoPauloTZ(): Date {
-  // Create a date formatter for São Paulo timezone
-  const formatter = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'America/Sao_Paulo',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false
+// Você ainda precisaria de uma getCurrentDateInSaoPauloTZ para o log [API] Horário em São Paulo
+// como sugerido anteriormente com Intl.DateTimeFormat
+export function getCurrentDateInSaoPauloTZ() {
+  const saoPauloTimeZone = 'America/Sao_Paulo';
+  const nowUtc = new Date();
+  const formatter = new Intl.DateTimeFormat('sv-SE', {
+    timeZone: saoPauloTimeZone,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
   });
-  
-  // Get current date
-  const now = new Date();
-  const parts = formatter.formatToParts(now);
-  
-  // Build date object from parts
-  const partValues: Record<string, string> = {};
-  parts.forEach(part => {
-    partValues[part.type] = part.value;
-  });
-  
-  // Create SP time formatted strings
-  const year = partValues.year;
-  const month = partValues.month;
-  const day = partValues.day;
-  const hour = partValues.hour;
-  const minute = partValues.minute;
-  const second = partValues.second;
-  
-  // Create and return date object in SP timezone
-  return new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}`);
+  return {
+    formatted: formatter.format(nowUtc)
+    // não precisa mais do 'date' aqui se verificarHorarioProgramado usa new Date()
+  };
 }

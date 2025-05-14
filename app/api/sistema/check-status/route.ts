@@ -27,9 +27,12 @@ export async function GET() {
       });
     }
     
+    // Get current time in São Paulo
+    const spTime = getCurrentDateInSaoPauloTZ();
+    
     // Log timezone information for debugging
     console.log(`[API] Horário atual UTC: ${new Date().toISOString()}`);
-    console.log(`[API] Horário em São Paulo: ${getCurrentDateInSaoPauloTZ().toISOString()}`);
+    console.log(`[API] Horário em São Paulo: ${spTime.formatted}`);
     
     // Check if current time is within the scheduled window using São Paulo timezone
     const dentroDoHorario = verificarHorarioProgramado(
@@ -74,7 +77,8 @@ export async function GET() {
           dataFim: config['data_fim'],
           horaFim: config['hora_fim'],
           dentroDoHorario,
-          timezone: 'America/Sao_Paulo'
+          timezone: 'America/Sao_Paulo',
+          currentTimeSP: spTime.formatted
         }
       });
     }
@@ -90,7 +94,8 @@ export async function GET() {
         dataFim: config['data_fim'],
         horaFim: config['hora_fim'],
         dentroDoHorario,
-        timezone: 'America/Sao_Paulo'
+        timezone: 'America/Sao_Paulo',
+        currentTimeSP: spTime.formatted
       }
     });
   } catch (error) {
