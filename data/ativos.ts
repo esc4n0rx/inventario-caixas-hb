@@ -10,9 +10,9 @@ export const ativos = [
     imagem: "618.jpg",
   },
   {
-    id: "hb415",
-    nome: "HB 415",
-    imagem: "hb415.jpg",
+    id: "caixabag", 
+    nome: "CAIXA BAG", 
+    imagem: "caixabag.jpg",
   },
   {
     id: "hntg",
@@ -34,4 +34,4 @@ export const ativos = [
     nome: "CAIXA BIN",
     imagem: "bin.jpg",
   },
-]
+];

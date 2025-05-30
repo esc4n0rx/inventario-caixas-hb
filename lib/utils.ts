@@ -125,14 +125,11 @@ export function gerarEmailTeste(lojaId: string, dominio: string = "hortifruti.co
   const prefixo = prefixos[Math.floor(Math.random() * prefixos.length)];
   return `${prefixo}.${lojaId}@${dominio}`;
 }
-/**
-+ * Retorna o nome da loja a partir do ID
-+ */
+
 export function getNomeLoja(lojaId: string): string {
   return lojas.find(l => l.id === lojaId)?.nome || `Loja ${lojaId}`;
  }
 
-// lib/utils.js
 export function verificarHorarioProgramado(
   dataInicio: string,
   horaInicio: string,
@@ -142,17 +139,14 @@ export function verificarHorarioProgramado(
   if (!dataInicio || !horaInicio || !dataFim || !horaFim) {
     return false;
   }
-  const saoPauloOffset = '-03:00'; // CUIDADO: Isso pode mudar com horário de verão (embora não mais em SP)
-                                  // Uma biblioteca lida com isso dinamicamente.
+  const saoPauloOffset = '-03:00'; 
+                            
 
-  const agoraUtcDate = new Date(); // Horário atual UTC
+  const agoraUtcDate = new Date(); 
 
-  // Construir strings ISO para início e fim com o offset de SP
-  // Isso informa ao construtor Date que a data/hora fornecida é de SP
   const inicioSaoPauloISO = `${dataInicio}T${horaInicio}:00.000${saoPauloOffset}`;
   const fimSaoPauloISO = `${dataFim}T${horaFim}:00.000${saoPauloOffset}`;
 
-  // Criar objetos Date. Eles serão internamente UTC, representando o momento correto.
   const inicioProgramadoUtcEquivDate = new Date(inicioSaoPauloISO);
   const fimProgramadoUtcEquivDate = new Date(fimSaoPauloISO);
 
@@ -165,7 +159,6 @@ export function verificarHorarioProgramado(
   const inicioTimestamp = inicioProgramadoUtcEquivDate.getTime();
   const fimTimestamp = fimProgramadoUtcEquivDate.getTime();
 
-  // Verifica se o horário atual está dentro do intervalo [início, fim)
   const estaDentro = agoraTimestamp >= inicioTimestamp && agoraTimestamp < fimTimestamp;
 
   console.log(`• Comparando (Timestamps UTC): <span class="math-inline">\{agoraTimestamp\} \(</span>{agoraUtcDate.toISOString()}) está entre <span class="math-inline">\{inicioTimestamp\} \(</span>{inicioProgramadoUtcEquivDate.toISOString()}) e <span class="math-inline">\{fimTimestamp\} \(</span>{fimProgramadoUtcEquivDate.toISOString()})`);
@@ -174,8 +167,6 @@ export function verificarHorarioProgramado(
   return estaDentro;
 }
 
-// Você ainda precisaria de uma getCurrentDateInSaoPauloTZ para o log [API] Horário em São Paulo
-// como sugerido anteriormente com Intl.DateTimeFormat
 export function getCurrentDateInSaoPauloTZ() {
   const saoPauloTimeZone = 'America/Sao_Paulo';
   const nowUtc = new Date();
@@ -186,6 +177,5 @@ export function getCurrentDateInSaoPauloTZ() {
   });
   return {
     formatted: formatter.format(nowUtc)
-    // não precisa mais do 'date' aqui se verificarHorarioProgramado usa new Date()
   };
 }
