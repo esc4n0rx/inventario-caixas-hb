@@ -1,30 +1,38 @@
 // app/api/sistema/config/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
-import { verificarHorarioProgramado, getCurrentDateInSaoPauloTZ } from '@/lib/utils';
+import { supabase } from '@/lib/supabase'; //
+import { verificarHorarioProgramado, getCurrentDateInSaoPauloTZ } from '@/lib/utils'; //
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  console.log("[API /sistema/config] Received GET request");
   try {
     const { data, error } = await supabase
       .from('configuracao_sistema')
       .select('*');
     
-    if (error) throw error;
+    if (error) {
+      console.error("[API /sistema/config] Error fetching config from Supabase:", error);
+      throw error;
+    }
+    console.log("[API /sistema/config] Fetched config from Supabase:", data);
     
     const config: { [key: string]: string } = {};
-    data.forEach(item => {
-      config[item.chave] = item.valor;
-    });
+    if (data) {
+      data.forEach(item => {
+        config[item.chave] = item.valor;
+      });
+    }
     
     const processedConfig = {
       bloqueado: config['sistema_bloqueado'] === 'true',
-      modo: config['sistema_modo'] || 'manual',
+      modo: (config['sistema_modo'] || 'manual') as 'automatico' | 'manual',
       dataInicio: config['data_inicio'] || '',
       horaInicio: config['hora_inicio'] || '',
       dataFim: config['data_fim'] || '',
       horaFim: config['hora_fim'] || '',
-      timezone: 'America/Sao_Paulo' // Add timezone info
+      timezone: 'America/Sao_Paulo' 
     };
+    console.log("[API /sistema/config] Processed config for response:", processedConfig);
     
     return NextResponse.json({ 
       success: true, 
@@ -40,130 +48,134 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  console.log("[API /sistema/config] Received POST request");
   try {
     const { config, senha } = await request.json();
+    console.log("[API /sistema/config] Request body:", { config, senha_present: !!senha });
     
     if (senha !== process.env.ADMIN_PASSWORD) {
+      console.warn("[API /sistema/config] Unauthorized attempt: Incorrect admin password.");
       return NextResponse.json(
         { error: 'Não autorizado' },
         { status: 401 }
       );
     }
+    console.log("[API /sistema/config] Admin password verified.");
     
-    if (config.modo === undefined) {
+    if (!config || config.modo === undefined) { // Checa se config existe e tem modo
+      console.error("[API /sistema/config] Incomplete configuration data received:", config);
       return NextResponse.json(
-        { error: 'Dados de configuração incompletos' },
+        { error: 'Dados de configuração incompletos ou inválidos' },
         { status: 400 }
       );
     }
     
     const operations = [];
+    const now = new Date().toISOString();
     
-    // First, update the mode
+    // Atualiza 'sistema_modo'
     operations.push(
       supabase
         .from('configuracao_sistema')
         .upsert({
           chave: 'sistema_modo',
           valor: config.modo,
-          data_modificacao: new Date().toISOString()
-        })
+          data_modificacao: now
+        }, { onConflict: 'chave' })
     );
+    console.log(`[API /sistema/config] Upserting sistema_modo to: ${config.modo}`);
     
-    // If automatic mode, update schedule details and check if system should be blocked
     if (config.modo === 'automatico') {
-      if (config.dataInicio) {
-        operations.push(
-          supabase
-            .from('configuracao_sistema')
-            .upsert({
-              chave: 'data_inicio',
-              valor: config.dataInicio,
-              data_modificacao: new Date().toISOString()
-            })
-        );
-      }
-      
-      if (config.horaInicio) {
-        operations.push(
-          supabase
-            .from('configuracao_sistema')
-            .upsert({
-              chave: 'hora_inicio',
-              valor: config.horaInicio,
-              data_modificacao: new Date().toISOString()
-            })
-        );
-      }
-      
-      if (config.dataFim) {
-        operations.push(
-          supabase
-            .from('configuracao_sistema')
-            .upsert({
-              chave: 'data_fim',
-              valor: config.dataFim,
-              data_modificacao: new Date().toISOString()
-            })
-        );
-      }
-      
-      if (config.horaFim) {
-        operations.push(
-          supabase
-            .from('configuracao_sistema')
-            .upsert({
-              chave: 'hora_fim',
-              valor: config.horaFim,
-              data_modificacao: new Date().toISOString()
-            })
-        );
-      }
-      
-      // If all schedule parameters are provided, update system blocked state
-      if (config.dataInicio && config.horaInicio && config.dataFim && config.horaFim) {
-        // Get current SP time for logging
+      console.log("[API /sistema/config] Mode is 'automatico'. Processing schedule fields.");
+      // Apenas atualiza campos de data/hora se eles existirem no payload `config`
+      // Isso permite que o cliente envie apenas o modo para mudar para automático
+      // e, se o agendamento já existir no BD, ele será usado pelo check-status.
+      // Se o cliente envia um novo agendamento, ele será salvo.
+      const scheduleFields: string[] = ['dataInicio', 'horaInicio', 'dataFim', 'horaFim'];
+      let hasAllScheduleFieldsInPayload = true;
+
+      scheduleFields.forEach(field => {
+        if (config[field] !== undefined && config[field] !== null) { // Permite string vazia para limpar, mas não undefined
+          operations.push(
+            supabase
+              .from('configuracao_sistema')
+              .upsert({
+                chave: field.replace(/([A-Z])/g, '_$1').toLowerCase(), // dataInicio -> data_inicio
+                valor: config[field],
+                data_modificacao: now
+              }, { onConflict: 'chave' })
+          );
+          console.log(`[API /sistema/config] Upserting ${field} to: ${config[field]}`);
+        } else {
+          // Se algum campo do agendamento estiver faltando no payload e o modo é automático,
+          // não podemos recalcular 'sistema_bloqueado' com base neste payload.
+          // O 'sistema_bloqueado' será então determinado pelo 'SystemStatusChecker' com base
+          // nos valores que *estão* no banco de dados.
+          hasAllScheduleFieldsInPayload = false;
+        }
+      });
+
+      // Atualiza 'sistema_bloqueado' APENAS SE todos os campos de agendamento necessários
+      // foram fornecidos neste request específico. Caso contrário, 'sistema_bloqueado'
+      // será gerenciado pelo SystemStatusChecker ou por uma alteração manual.
+      if (hasAllScheduleFieldsInPayload && config.dataInicio && config.horaInicio && config.dataFim && config.horaFim) {
         const spTime = getCurrentDateInSaoPauloTZ();
+        console.log(`[API /sistema/config] All schedule fields present in payload. Verificando horário programado (SP Time: ${spTime.formatted})`);
         
-        console.log("[API Config] Verificando horário programado com timezone SP");
-        console.log(`[API Config] Horário atual SP: ${spTime.formatted}`);
-        
-        // Check if current time is within schedule using São Paulo timezone
         const dentroDoHorario = verificarHorarioProgramado(
           config.dataInicio,
           config.horaInicio,
           config.dataFim,
           config.horaFim
         );
+        console.log(`[API /sistema/config] Dentro do horário (baseado no payload): ${dentroDoHorario}`);
         
-        console.log(`[API Config] Dentro do horário: ${dentroDoHorario}`);
-        
-        // System should be blocked if NOT within the scheduled window
         const deveBloqueado = !dentroDoHorario;
-        
         operations.push(
           supabase
             .from('configuracao_sistema')
             .upsert({
               chave: 'sistema_bloqueado',
               valor: deveBloqueado.toString(),
-              data_modificacao: new Date().toISOString()
-            })
+              data_modificacao: now
+            }, { onConflict: 'chave' })
         );
+        console.log(`[API /sistema/config] Upserting sistema_bloqueado to: ${deveBloqueado}`);
+      } else if (!hasAllScheduleFieldsInPayload) {
+          console.log("[API /sistema/config] Not all schedule fields provided in payload for automatic mode; sistema_bloqueado not updated by this call.");
       }
+    } else { // modo manual
+        console.log("[API /sistema/config] Mode is 'manual'. No schedule-based blocking applied by this call.");
+        // No modo manual, 'sistema_bloqueado' é controlado por /api/sistema/atualizar.
+        // Poderia-se, opcionalmente, limpar os campos de data/hora aqui se desejado.
+        // Ex: operations.push(supabase.from('configuracao_sistema').upsert({ chave: 'data_inicio', valor: ''...}))
+        // Mas, por ora, vamos manter simples: apenas o modo é alterado para manual.
     }
     
-    // Execute all database operations
-    await Promise.all(operations);
+    const settledOperations = await Promise.allSettled(operations.map(op => op.then(res => {
+      if (res.error) {
+        console.error("[API /sistema/config] Supabase operation error:", res.error);
+        // Lança o erro para ser pego pelo catch principal e retornar um 500 se alguma operação falhar.
+        throw new Error(`Supabase error: ${res.error.message}`);
+      }
+      return res;
+    })));
+
+    const failedOperations = settledOperations.filter(op => op.status === 'rejected');
+    if (failedOperations.length > 0) {
+        console.error("[API /sistema/config] One or more Supabase operations failed:", failedOperations);
+        throw new Error("Uma ou mais operações no banco de dados falharam ao salvar a configuração.");
+    }
     
+    console.log("[API /sistema/config] All Supabase operations successful.");
     return NextResponse.json({ 
       success: true, 
       message: 'Configurações atualizadas com sucesso' 
     });
-  } catch (error) {
-    console.error('Erro ao atualizar configurações do sistema:', error);
+  } catch (error: any) {
+    console.error('[API /sistema/config] Erro ao atualizar configurações do sistema:', error.message, error.stack);
     return NextResponse.json(
-      { error: 'Erro ao atualizar configurações do sistema' },
+      { error: `Erro ao atualizar configurações do sistema: ${error.message}` },
       { status: 500 }
     );
   }

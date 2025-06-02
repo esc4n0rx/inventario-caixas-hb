@@ -1,3 +1,4 @@
+// components/AdminDashboard.tsx
 import React, { useState, useEffect } from 'react';
 import {
   BarChart3,
@@ -65,12 +66,14 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
-import { toast } from '@/components/ui/use-toast';
+import { toast } from '@/components/ui/use-toast'; // Certifique-se que este é o hook correto
 import CleanupCard from "@/components/CleanupCard";
 import SystemMaintenanceCard from "@/components/SystemMaintenanceCard";
 import { formatarData } from '@/lib/utils';
 import { lojas } from '@/data/lojas';
 import { ativos } from '@/data/ativos';
+import IntegrationManager from './IntegrationManager'; // Import IntegrationManager
+import IntegrationLogs from './IntegrationLogs';     // Import IntegrationLogs
 
 const COLORS = [
   '#F4C95D', '#7C96AB', '#6DC267', '#F87171', '#60A5FA',
@@ -117,8 +120,8 @@ export interface AdminDashboardProps {
   onEditContagem: (id: string, quantidade: number) => Promise<void>;
 }
 
-// Schedule Config Dialog Component
-function ScheduleConfigDialog({
+// Schedule Config Dialog Component (local to AdminDashboard or imported)
+function ScheduleConfigDialogComponent({ // Renamed to avoid conflict if it's also a separate file
   open,
   onOpenChange,
   initialConfig,
@@ -129,16 +132,9 @@ function ScheduleConfigDialog({
   initialConfig: ScheduleForm;
   onSave: (config: ScheduleForm) => Promise<void>;
 }) {
-  const [formData, setFormData] = useState({
-    modo: initialConfig.modo || 'automatico',
-    dataInicio: initialConfig.dataInicio || '',
-    horaInicio: initialConfig.horaInicio || '',
-    dataFim: initialConfig.dataFim || '',
-    horaFim: initialConfig.horaFim || '',
-  });
+  const [formData, setFormData] = useState<ScheduleForm>(initialConfig);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Update form when initialConfig changes
   useEffect(() => {
     if (open) {
       setFormData({
@@ -151,16 +147,15 @@ function ScheduleConfigDialog({
     }
   }, [initialConfig, open]);
 
-  const handleChange = (field: string, value: string) => {
+  const handleChange = (field: keyof ScheduleForm, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
   const handleSubmit = async () => {
-    // Validate form fields
     if (!formData.dataInicio || !formData.horaInicio || !formData.dataFim || !formData.horaFim) {
       toast({
         title: "Campos incompletos",
-        description: "Todos os campos são obrigatórios. Por favor, preencha todos os campos.",
+        description: "Todos os campos de data e hora são obrigatórios para o modo automático.",
         variant: "destructive",
       });
       return;
@@ -168,14 +163,14 @@ function ScheduleConfigDialog({
 
     setIsSubmitting(true);
     try {
-      await onSave(formData);
+      await onSave(formData); // This will call props.onUpdateSchedule with full data
       onOpenChange(false);
-      console.log("Configuração salva com sucesso:", formData);
+      console.log("Configuração de agendamento salva com sucesso:", formData);
     } catch (error) {
-      console.error("Erro ao salvar configuração:", error);
+      console.error("Erro ao salvar configuração de agendamento:", error);
       toast({
         title: "Erro",
-        description: "Não foi possível salvar a configuração. Por favor, tente novamente.",
+        description: "Não foi possível salvar a configuração de agendamento. Tente novamente.",
         variant: "destructive",
       });
     } finally {
@@ -195,9 +190,10 @@ function ScheduleConfigDialog({
         <div className="space-y-4 py-2">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Data de Início</Label>
+              <Label htmlFor="dataInicioDlg">Data de Início</Label>
               <div className="relative">
                 <Input
+                  id="dataInicioDlg"
                   type="date"
                   value={formData.dataInicio}
                   onChange={(e) => handleChange('dataInicio', e.target.value)}
@@ -207,9 +203,10 @@ function ScheduleConfigDialog({
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Hora de Início</Label>
+              <Label htmlFor="horaInicioDlg">Hora de Início</Label>
               <div className="relative">
                 <Input
+                  id="horaInicioDlg"
                   type="time"
                   value={formData.horaInicio}
                   onChange={(e) => handleChange('horaInicio', e.target.value)}
@@ -221,9 +218,10 @@ function ScheduleConfigDialog({
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Data de Término</Label>
+              <Label htmlFor="dataFimDlg">Data de Término</Label>
               <div className="relative">
                 <Input
+                  id="dataFimDlg"
                   type="date"
                   value={formData.dataFim}
                   onChange={(e) => handleChange('dataFim', e.target.value)}
@@ -233,9 +231,10 @@ function ScheduleConfigDialog({
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Hora de Término</Label>
+              <Label htmlFor="horaFimDlg">Hora de Término</Label>
               <div className="relative">
                 <Input
+                  id="horaFimDlg"
                   type="time"
                   value={formData.horaFim}
                   onChange={(e) => handleChange('horaFim', e.target.value)}
@@ -268,6 +267,7 @@ function ScheduleConfigDialog({
   );
 }
 
+
 const AdminDashboard: React.FC<AdminDashboardProps> = ({
   contagensData,
   contagensTransitoData,
@@ -282,21 +282,25 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<'overview' | 'configurations' | 'management'>('overview');
   const [showScheduleDialog, setShowScheduleDialog] = useState<boolean>(false);
-  const [scheduleForm, setScheduleForm] = useState<ScheduleForm>({
+  
+  // scheduleFormState é o estado local para o diálogo de agendamento DENTRO do AdminDashboard
+  const [scheduleFormState, setScheduleFormState] = useState<ScheduleForm>({
     modo: systemConfig?.modo || 'manual',
     dataInicio: systemConfig?.dataInicio || '',
     horaInicio: systemConfig?.horaInicio || '',
     dataFim: systemConfig?.dataFim || '',
     horaFim: systemConfig?.horaFim || '',
   });
+
   const [editingContagem, setEditingContagem] = useState<Contagem | null>(null);
   const [showEditDialog, setShowEditDialog] = useState<boolean>(false);
   const [editForm, setEditForm] = useState<{ quantidade: number }>({ quantidade: 0 });
+  const [isIntegrationEnabled, setIsIntegrationEnabled] = useState(false);
 
-  // Update scheduleForm when systemConfig changes
+
   useEffect(() => {
     if (systemConfig) {
-      setScheduleForm({
+      setScheduleFormState({ // Atualiza o estado local do formulário do diálogo
         modo: systemConfig.modo || 'manual',
         dataInicio: systemConfig.dataInicio || '',
         horaInicio: systemConfig.horaInicio || '',
@@ -308,7 +312,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const totalLojas = lojas.length;
   const lojasComContagem = new Set(contagensData.map((c) => c.loja)).size;
-  const progressoInventario = (lojasComContagem / totalLojas) * 100;
+  const progressoInventario = totalLojas > 0 ? (lojasComContagem / totalLojas) * 100 : 0;
 
   const handleRefresh = async (): Promise<void> => {
     setRefreshing(true);
@@ -316,7 +320,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setTimeout(() => setRefreshing(false), 1000);
   };
 
-  const handleEditContagem = (contagem: Contagem): void => {
+  const handleEditContagemClick = (contagem: Contagem): void => {
     setEditingContagem(contagem);
     setEditForm({ quantidade: contagem.quantidade });
     setShowEditDialog(true);
@@ -326,76 +330,57 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     if (editingContagem) {
       await onEditContagem(editingContagem.id, editForm.quantidade);
       setShowEditDialog(false);
+      setEditingContagem(null);
     }
   };
-
-  // Improved function to save schedule
-  const handleSaveSchedule = async (formData: ScheduleForm): Promise<void> => {
-    console.log("Saving schedule with data:", formData);
-    
-    try {
-      // Make a direct API call to the config endpoint
-      const response = await fetch('/api/sistema/config', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          config: formData,
-          senha: localStorage.getItem('admin_password') || ''
-        }),
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Erro ao atualizar configurações');
-      }
-      
-      const data = await response.json();
-      console.log("Update response:", data);
-      
-      // Call the parent component's update function to refresh state
-      await onUpdateSchedule(formData);
-      
-      toast({
-        title: "Horário configurado",
-        description: "As configurações de horário foram salvas com sucesso.",
-      });
-      
-      // Refresh data to reflect changes
-      await onRefresh();
-      
-    } catch (error) {
-      console.error("Erro ao salvar configurações:", error);
-      toast({
-        title: "Erro",
-        description: "Não foi possível salvar as configurações de horário.",
-        variant: "destructive",
-      });
-    }
+  
+  // Esta função é chamada quando o diálogo de agendamento é salvo.
+  // `formData` vem diretamente do estado do diálogo.
+  const handleSaveScheduleDialog = async (formData: ScheduleForm): Promise<void> => {
+    await onUpdateSchedule(formData); // Passa os dados completos para a função da página admin
   };
 
-  const handleModeChange = (value: boolean) => {
-    const newMode = value ? 'automatico' : 'manual';
+  const handleModeChange = (checked: boolean) => {
+    const newMode = checked ? 'automatico' : 'manual';
     
-    setScheduleForm(prev => ({
-      ...prev,
-      modo: newMode
-    }));
-    
-    if (value) {
-      // If changing to automatic mode and schedule not set, show dialog
-      if (!systemConfig?.dataInicio || !systemConfig?.horaInicio) {
-        setShowScheduleDialog(true);
+    // Prepara a carga para onUpdateSchedule
+    // Se mudando para automático, e já existe um agendamento, envia esse agendamento.
+    // Se não existe agendamento, abre o diálogo para o usuário definir.
+    // Se mudando para manual, só envia o novo modo.
+    if (newMode === 'automatico') {
+      const hasExistingValidSchedule =
+        systemConfig?.dataInicio &&
+        systemConfig?.horaInicio &&
+        systemConfig?.dataFim &&
+        systemConfig?.horaFim;
+
+      if (hasExistingValidSchedule) {
+        onUpdateSchedule({ // Envia o modo E o agendamento existente
+          modo: newMode,
+          dataInicio: systemConfig.dataInicio,
+          horaInicio: systemConfig.horaInicio,
+          dataFim: systemConfig.dataFim,
+          horaFim: systemConfig.horaFim,
+        });
       } else {
-        // If schedule is already set, just update the mode
-        onUpdateSchedule({ modo: newMode });
+        // Agendamento não existe ou incompleto, precisa abrir o diálogo
+        // Atualiza o estado local do formulário do diálogo para 'automatico' antes de abrir
+        setScheduleFormState(prev => ({
+            ...prev,
+            modo: newMode,
+            dataInicio: prev.dataInicio || '', // Mantém ou usa vazio
+            horaInicio: prev.horaInicio || '',
+            dataFim: prev.dataFim || '',
+            horaFim: prev.horaFim || '',
+        }));
+        setShowScheduleDialog(true);
       }
-    } else {
-      // If changing to manual mode, just update that
-      onUpdateSchedule({ modo: newMode });
+    } else { // newMode === 'manual'
+      onUpdateSchedule({ modo: newMode }); // A API /api/sistema/config só precisa do modo aqui
+                                          // A API /api/sistema/atualizar (chamada por onToggleSystem) também setará modo para manual.
     }
   };
+
 
   const calcularMediaPorHora = (): string => {
     if (!contagensData.length) return '0.0';
@@ -417,7 +402,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const prepararDadosContagensPorLoja = (): Array<{ loja: string; total: number }> => {
     const agg: Record<string, { loja: string; total: number }> = {};
     contagensData.forEach((c) => {
-      if (!agg[c.loja]) agg[c.loja] = { loja: c.loja_nome, total: 0 };
+      if (!agg[c.loja]) agg[c.loja] = { loja: c.loja_nome || `Loja ${c.loja}`, total: 0 };
       agg[c.loja].total += c.quantidade;
     });
     return Object.values(agg)
@@ -428,7 +413,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const prepararDadosAtivosPorContagem = (): Array<{ ativo: string; total: number }> => {
     const agg: Record<string, { ativo: string; total: number }> = {};
     contagensData.forEach((c) => {
-      if (!agg[c.ativo]) agg[c.ativo] = { ativo: c.ativo_nome, total: 0 };
+      if (!agg[c.ativo]) agg[c.ativo] = { ativo: c.ativo_nome || `Ativo ${c.ativo}`, total: 0 };
       agg[c.ativo].total += c.quantidade;
     });
     return Object.values(agg);
@@ -449,31 +434,66 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const mediaPorHora = calcularMediaPorHora();
 
   const sistemaAutomatico = systemConfig?.modo === 'automatico';
-  const sistemaLigado = !(systemConfig?.bloqueado ?? false);
+  const sistemaLigado = !(systemConfig?.bloqueado ?? true); // Default to blocked if systemConfig is null
 
   const verificarHorarioProgramado = (): boolean => {
-    if (!systemConfig || !systemConfig.dataInicio || !systemConfig.dataFim) return false;
+    if (!systemConfig || !systemConfig.dataInicio || !systemConfig.horaInicio || !systemConfig.dataFim || !systemConfig.horaFim) return false;
     try {
-      const now = new Date();
-      const inicio = new Date(`${systemConfig.dataInicio}T${systemConfig.horaInicio}`);
-      const fim = new Date(`${systemConfig.dataFim}T${systemConfig.horaFim}`);
-      return now >= inicio && now <= fim;
+      const now = new Date(); // Hora local da máquina que executa o JS (navegador)
+      
+      // Para consistência, idealmente esta lógica deveria estar no backend ou usar UTC.
+      // Assumindo que as datas/horas no systemConfig são para o fuso horário local do servidor/usuário.
+      const inicioProgramado = new Date(`${systemConfig.dataInicio}T${systemConfig.horaInicio}`);
+      const fimProgramado = new Date(`${systemConfig.dataFim}T${systemConfig.horaFim}`);
+      
+      return now >= inicioProgramado && now <= fimProgramado;
     } catch (error) {
-      console.error('Erro ao verificar horário:', error);
+      console.error('Erro ao verificar horário programado:', error);
       return false;
     }
   };
 
-  const dentroDoHorario = verificarHorarioProgramado();
+  const dentroDoHorario = sistemaAutomatico ? verificarHorarioProgramado() : false;
 
-  const formatarDataBR = (dataISO: string): string => {
-    if (!dataISO) return '';
-    const [ano, mes, dia] = dataISO.split('-');
-    return `${dia}/${mes}/${ano}`;
+  const formatarDataBR = (dataISO: string | undefined): string => {
+    if (!dataISO) return '--/--/----';
+    // Adicionar verificação para formato de data, pois pode vir direto do input type="date" (YYYY-MM-DD)
+    if (dataISO.includes('-') && dataISO.length === 10) {
+        const [ano, mes, dia] = dataISO.split('-');
+        if (ano && mes && dia) return `${dia}/${mes}/${ano}`;
+    }
+    // Tentar formatar se for ISO completo
+    try {
+        const dataObj = new Date(dataISO);
+        if (isNaN(dataObj.getTime())) return '--/--/----'; // Data inválida
+        const dia = dataObj.getDate().toString().padStart(2, '0');
+        const mes = (dataObj.getMonth() + 1).toString().padStart(2, '0');
+        const ano = dataObj.getFullYear();
+        return `${dia}/${mes}/${ano}`;
+    } catch (e) {
+        return '--/--/----';
+    }
   };
+  
+  // Função para formatar a hora, garantindo que seja HH:MM
+  const formatarHora = (hora: string | undefined): string => {
+    if (!hora) return '--:--';
+    // Se já estiver no formato HH:MM, retorna. Caso contrário, tenta formatar.
+    if (/^\d{2}:\d{2}$/.test(hora)) return hora;
+    if (/^\d{2}:\d{2}:\d{2}$/.test(hora)) return hora.substring(0,5); // Remove segundos
+
+    try {
+        const [h,m] = hora.split(':');
+        if(h && m) return `${h.padStart(2,'0')}:${m.padStart(2,'0')}`;
+    } catch(e) {
+        // se não conseguir formatar, retorna o valor original ou um placeholder
+    }
+    return hora || '--:--';
+  }
 
   return (
     <div className="flex flex-col w-full">
+      {/* Header do Dashboard */}
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-2xl font-bold flex items-center">
@@ -492,8 +512,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
             disabled={refreshing || isLoading}
             className="border-zinc-700 text-white hover:bg-zinc-800 h-9"
           >
-            <RefreshCcw className={`mr-1 h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-            Atualizar
+            <RefreshCcw className={`mr-1 h-4 w-4 ${refreshing || isLoading ? 'animate-spin' : ''}`} />
+            {isLoading ? "Carregando..." : (refreshing ? "Atualizando..." : "Atualizar")}
           </Button>
         </div>
       </div>
@@ -514,15 +534,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
         {/* Conteúdo das abas */}
         <TabsContent value="overview" className="mt-0">
-          {isLoading ? (
+          {isLoading && !systemConfig ? ( // Mostra loading se systemConfig ainda não carregou
             <div className="flex justify-center items-center h-64">
               <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-[#F4C95D] border-r-2 border-b-2 border-transparent"></div>
-              <p className="ml-2">Carregando dados...</p>
+              <p className="ml-2">Carregando dados do sistema...</p>
             </div>
           ) : (
             <>
               {/* Cards de Status */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                 <Card className="bg-zinc-800/50 border-zinc-700/50">
                   <CardContent className="pt-6">
                     <div className="flex justify-between items-start">
@@ -537,7 +557,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         <Layers className="h-6 w-6 text-[#F4C95D]" />
                       </div>
                     </div>
-                    <Progress value={progressoInventario} className="h-2.5 bg-zinc-700" />
+                    <Progress value={progressoInventario} className="h-2.5 bg-zinc-700 mt-3" />
                   </CardContent>
                 </Card>
 
@@ -546,7 +566,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <div className="flex justify-between items-start">
                       <div>
                         <p className="text-zinc-400 text-sm mb-1">Contagens Recebidas</p>
-                        <div className="text-2xl font-bold">{contagensData.length / ativos.length}</div>
+                        <div className="text-2xl font-bold">{contagensData.length > 0 ? Math.round(contagensData.length / ativos.length) : 0}</div>
                         <div className="text-xs text-zinc-400 mt-1">
                           {contagensData.length} registros no total
                         </div>
@@ -562,7 +582,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <CardContent className="pt-6">
                     <div className="flex justify-between items-start">
                       <div>
-                        <p className="text-zinc-400 text-sm mb-1">Total de Ativos</p>
+                        <p className="text-zinc-400 text-sm mb-1">Total de Ativos Contados</p>
                         <div className="text-2xl font-bold">
                           {dadosAtivosPorContagem.reduce((sum, item) => sum + item.total, 0)}
                         </div>
@@ -581,10 +601,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <CardContent className="pt-6">
                     <div className="flex justify-between items-start">
                       <div>
-                        <p className="text-zinc-400 text-sm mb-1">Média por Hora</p>
+                        <p className="text-zinc-400 text-sm mb-1">Média Registros/Hora</p>
                         <div className="text-2xl font-bold">{mediaPorHora}</div>
                         <div className="text-xs text-zinc-400 mt-1">
-                          Nas últimas 24 horas
+                          Últimas 24 horas
                         </div>
                       </div>
                       <div className="bg-zinc-700/50 p-2 rounded-lg">
@@ -610,21 +630,21 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         <div className="flex justify-between items-center">
                           <div>
                             <div className="text-sm font-medium text-zinc-400">Estado</div>
-                            <div className="mt-1 font-medium">
+                            <div className={`mt-1 font-medium ${sistemaLigado ? 'text-green-400' : 'text-red-400'}`}>
                               {sistemaLigado ? 'Sistema Online' : 'Sistema Offline'}
                             </div>
                           </div>
-                          <div className={`h-4 w-4 rounded-full ${sistemaLigado ? 'bg-green-500' : 'bg-red-500'} animate-pulse`}></div>
+                          <div className={`h-3 w-3 rounded-full ${sistemaLigado ? 'bg-green-500' : 'bg-red-500'} ${sistemaLigado ? 'animate-pulse' : ''}`}></div>
                         </div>
                       </div>
                       
                       <div className="p-4 rounded-lg border border-zinc-700/30 bg-zinc-700/20">
                         <div className="text-sm font-medium text-zinc-400">Modo de Operação</div>
-                        <div className="mt-1 font-medium flex items-center">
-                          {sistemaAutomatico ? (
+                        <div className="mt-1 font-medium flex items-center capitalize">
+                          {systemConfig?.modo === 'automatico' ? (
                             <>
                               <Clock3 className="h-4 w-4 mr-1.5 text-[#F4C95D]" />
-                              Programado
+                              Automático
                             </>
                           ) : (
                             <>
@@ -635,13 +655,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         </div>
                       </div>
                       
-                      {sistemaAutomatico && (
-                        <div className={`p-4 rounded-lg border ${dentroDoHorario ? 'bg-green-900/20 border-green-800/30' : 'bg-amber-900/20 border-amber-800/30'}`}>
-                          <div className="text-sm font-medium text-zinc-400">Janela de Funcionamento</div>
-                          <div className="mt-1 font-medium">
-                            {systemConfig?.dataInicio && 
-                             `${formatarDataBR(systemConfig.dataInicio)} ${systemConfig.horaInicio} até ${formatarDataBR(systemConfig?.dataFim || '')} ${systemConfig?.horaFim || ''}`}
-                          </div>
+                      {systemConfig?.modo === 'automatico' && (
+                        <div className={`p-4 rounded-lg border ${dentroDoHorario && sistemaLigado ? 'bg-green-900/20 border-green-800/30' : 'bg-amber-900/20 border-amber-800/30'}`}>
+                           <div className="text-sm font-medium text-zinc-400">Janela Programada</div>
+                           {systemConfig.dataInicio && systemConfig.horaInicio && systemConfig.dataFim && systemConfig.horaFim ? (
+                            <div className="mt-1 font-medium text-xs">
+                                De: {formatarDataBR(systemConfig.dataInicio)} {formatarHora(systemConfig.horaInicio)}<br/>
+                                Até: {formatarDataBR(systemConfig.dataFim)} {formatarHora(systemConfig.horaFim)}
+                            </div>
+                           ) : (
+                            <div className="mt-1 font-medium text-amber-400 text-xs">Não configurada</div>
+                           )}
                         </div>
                       )}
                     </div>
@@ -649,81 +673,84 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </Card>
               </div>
 
-              {/* Gráficos em duas colunas */}
+              {/* Gráficos */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                {/* Gráfico de barras - Top Lojas */}
                 <Card className="bg-zinc-800/50 border-zinc-700/50">
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-lg font-medium">Top Lojas por Contagem</CardTitle>
-                    <CardDescription>Total de itens contados por loja</CardDescription>
+                    <CardTitle className="text-lg font-medium">Top Lojas por Quantidade</CardTitle>
                   </CardHeader>
                   <CardContent className="pt-0">
-                    <div className="h-64">
+                    <div className="h-[300px]">
                       <ResponsiveContainer width="100%" height="100%">
                         <BarChart
                           data={dadosContagensPorLoja}
                           layout="vertical"
-                          margin={{ top: 20, right: 30, left: 90, bottom: 5 }}
+                          margin={{ top: 5, right: 20, left: 70, bottom: 5 }}
                         >
-                          <CartesianGrid strokeDasharray="3 3" stroke="#444" horizontal={false} />
-                          <XAxis type="number" stroke="#888" />
+                          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" horizontal={false} />
+                          <XAxis type="number" stroke="rgba(255,255,255,0.5)" tick={{ fontSize: 10 }} />
                           <YAxis 
                             dataKey="loja" 
                             type="category" 
-                            stroke="#888" 
-                            width={80}
-                            tick={{ fontSize: 11 }}
+                            stroke="rgba(255,255,255,0.5)" 
+                            width={70}
+                            tick={{ fontSize: 10 }}
+                            interval={0}
                           />
                           <RechartsTooltip 
+                            cursor={{fill: 'rgba(255,255,255,0.05)'}}
                             contentStyle={{ 
-                              backgroundColor: '#333', 
-                              border: '1px solid #555',
-                              borderRadius: '4px'
+                              backgroundColor: 'rgba(30,30,30,0.9)', 
+                              borderColor: 'rgba(255,255,255,0.2)',
+                              borderRadius: '4px',
+                              fontSize: '12px'
                             }}
                           />
-                          <Bar dataKey="total" fill="#F4C95D" radius={[0, 4, 4, 0]} />
+                          <Bar dataKey="total" fill="#F4C95D" radius={[0, 4, 4, 0]} barSize={15} />
                         </BarChart>
                       </ResponsiveContainer>
                     </div>
                   </CardContent>
                 </Card>
 
-                {/* Gráfico de Linha - Contagens por Hora */}
                 <Card className="bg-zinc-800/50 border-zinc-700/50">
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-lg font-medium">Contagens por Hora</CardTitle>
-                    <CardDescription>Distribuição das contagens durante o dia</CardDescription>
+                    <CardTitle className="text-lg font-medium">Registros de Contagem por Hora</CardTitle>
                   </CardHeader>
                   <CardContent className="pt-0">
-                    <div className="h-80">
+                    <div className="h-[300px]">
                       <ResponsiveContainer width="100%" height="100%">
                         <LineChart
                           data={dadosContagensPorHora}
-                          margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                          margin={{ top: 20, right: 30, left: 0, bottom: 5 }}
                         >
-                          <CartesianGrid strokeDasharray="3 3" stroke="#444" />
+                          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
                           <XAxis 
                             dataKey="hora" 
-                            stroke="#888"
+                            stroke="rgba(255,255,255,0.5)"
                             tickFormatter={(value) => `${value}h`} 
+                            tick={{ fontSize: 10 }}
                           />
-                          <YAxis stroke="#888" />
+                          <YAxis stroke="rgba(255,255,255,0.5)" allowDecimals={false} tick={{ fontSize: 10 }}/>
                           <RechartsTooltip 
+                             cursor={{stroke: '#F4C95D', strokeWidth: 1, strokeDasharray: "3 3"}}
                             contentStyle={{ 
-                              backgroundColor: '#333', 
-                              border: '1px solid #555',
-                              borderRadius: '4px'
+                              backgroundColor: 'rgba(30,30,30,0.9)', 
+                              borderColor: 'rgba(255,255,255,0.2)',
+                              borderRadius: '4px',
+                              fontSize: '12px'
                             }}
-                            formatter={(value, name) => [`${value} contagens`, 'Total']}
-                            labelFormatter={(label) => `${label}:00 - ${label}:59`}
+                            formatter={(value: number, name: string) => [`${value} ${name === 'contagens' ? 'registros' : value}`, 'Total']}
+                            labelFormatter={(label: number) => `${label.toString().padStart(2,'0')}:00 - ${label.toString().padStart(2,'0')}:59`}
                           />
                           <Line 
                             type="monotone" 
                             dataKey="contagens" 
+                            name="Registros"
                             stroke="#F4C95D" 
                             strokeWidth={2}
-                            dot={{ r: 4 }}
-                            activeDot={{ r: 6, stroke: '#F4C95D', strokeWidth: 2 }}
+                            dot={{ r: 3, fill: '#F4C95D', strokeWidth:1, stroke: 'rgba(30,30,30,0.9)' }}
+                            activeDot={{ r: 5, stroke: '#F4C95D', strokeWidth: 2, fill: 'rgba(30,30,30,0.9)' }}
                           />
                         </LineChart>
                       </ResponsiveContainer>
@@ -731,311 +758,188 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   </CardContent>
                 </Card>
               </div>
+                
+              <IntegrationManager 
+                systemConfig={systemConfig} 
+                isLoading={isLoading} 
+                onRefresh={handleRefresh}
+              />
+              <IntegrationLogs isIntegrationEnabled={isIntegrationEnabled} />
 
-              {/* Gráfico de pizza - Tipos de Ativo */}
-              <Card className="bg-zinc-800/50 border-zinc-700/50 mb-6">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-lg font-medium">Distribuição por Tipo de Ativo</CardTitle>
-                  <CardDescription>Quantidade total por tipo de caixa</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-64 flex justify-center">
-                    <ResponsiveContainer width="80%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={dadosAtivosPorContagem}
-                          cx="50%"
-                          cy="50%"
-                          labelLine={false}
-                          outerRadius={120}
-                          innerRadius={60}
-                          fill="#8884d8"
-                          dataKey="total"
-                          nameKey="ativo"
-                          label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                        >
-                          {dadosAtivosPorContagem.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                          ))}
-                        </Pie>
-                        <RechartsTooltip 
-                          contentStyle={{ 
-                            backgroundColor: '#333', 
-                            border: '1px solid #555',
-                            borderRadius: '4px'
-                          }}
-                          formatter={(value, name, props) => [`${value} unidades`, props.payload.ativo]}
-                        />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </div>
-                </CardContent>
-              </Card>
+
             </>
           )}
         </TabsContent>
 
         <TabsContent value="configurations" className="mt-0">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Configuração de Modo */}
-            <Card className="bg-zinc-800/50 border-zinc-700/50">
-              <CardHeader>
-                <CardTitle className="text-lg font-medium">Modo de Operação</CardTitle>
-                <CardDescription>Determine como o sistema liga e desliga</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-6">
-                  <div className="flex items-center justify-between p-4 rounded-lg bg-zinc-700/20 border border-zinc-700/30">
-                    <div className="space-y-0.5">
-                      <Label className="text-base">Modo Automatizado</Label>
-                      <p className="text-sm text-zinc-400">
-                        Sistema liga e desliga nos horários programados
-                      </p>
-                    </div>
-                    <Switch 
-                      checked={sistemaAutomatico} 
-                      onCheckedChange={handleModeChange}
-                    />
-                  </div>
-
-                  {sistemaAutomatico ? (
-                    <div className="border border-zinc-700/30 rounded-lg p-4">
-                      <div className="flex justify-between items-center mb-4">
-                        <div>
-                          <h3 className="font-medium">Horário Programado</h3>
-                          <p className="text-sm text-zinc-400">
-                            Janela de funcionamento do sistema
-                          </p>
-                        </div>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setShowScheduleDialog(true)}
-                          className="border-zinc-700 text-white hover:bg-zinc-700"
-                        >
-                          <Calendar className="h-4 w-4 mr-1" />
-                          Configurar
-                        </Button>
-                      </div>
-
-                      {systemConfig?.dataInicio ? (
-                        <div className="space-y-2 text-sm">
-                          <div className="flex justify-between bg-zinc-700/20 p-3 rounded-md">
-                            <span className="text-zinc-400">Data Início:</span>
-                            <span>{systemConfig.dataInicio.split('-').reverse().join('/')}</span>
-                          </div>
-                          <div className="flex justify-between bg-zinc-700/20 p-3 rounded-md">
-                            <span className="text-zinc-400">Hora Início:</span>
-                            <span>{systemConfig.horaInicio}</span>
-                          </div>
-                          <div className="flex justify-between bg-zinc-700/20 p-3 rounded-md">
-                            <span className="text-zinc-400">Data Fim:</span>
-                            <span>{systemConfig.dataFim?.split('-').reverse().join('/') || '-'}</span>
-                          </div>
-                          <div className="flex justify-between bg-zinc-700/20 p-3 rounded-md">
-                            <span className="text-zinc-400">Hora Fim:</span>
-                            <span>{systemConfig.horaFim}</span>
-                          </div>
-                          <div className="flex justify-between bg-zinc-700/20 p-3 rounded-md">
-                            <span className="text-zinc-400">Status Atual:</span>
-                            <span className={dentroDoHorario ? "text-green-400" : "text-amber-400"}>
-                              {dentroDoHorario ? "Dentro do horário" : "Fora do horário"}
-                            </span>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="bg-amber-900/20 text-amber-400 p-3 rounded-md text-sm">
-                          <AlertTriangle className="h-4 w-4 inline mr-1" />
-                          Nenhum horário configurado ainda
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="border border-zinc-700/30 rounded-lg p-4">
-                      <div className="flex justify-between items-center mb-4">
-                        <div>
-                          <h3 className="font-medium">Controle Manual</h3>
-                          <p className="text-sm text-zinc-400">
-                            Ligar ou desligar o sistema manualmente
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="flex flex-col gap-3">
-                        <Button
-                          onClick={() => onToggleSystem(false)}
-                          className={`h-12 ${!sistemaLigado ? 'bg-red-900/30 text-red-400 border-red-900/50' : 'bg-zinc-700/30 text-zinc-400 border-zinc-700/50'} border`}
-                          variant="outline"
-                          disabled={!sistemaLigado}
-                        >
-                          <div className={`h-2 w-2 mr-2 rounded-full ${!sistemaLigado ? 'bg-red-500' : 'bg-zinc-500'}`} />
-                          Desligar Sistema
-                        </Button>
-                        
-                        <Button
-                          onClick={() => onToggleSystem(true)}
-                          className={`h-12 ${sistemaLigado ? 'bg-green-900/30 text-green-400 border-green-900/50' : 'bg-zinc-700/30 text-zinc-400 border-zinc-700/50'} border`}
-                          variant="outline"
-                          disabled={sistemaLigado}
-                        >
-                          <div className={`h-2 w-2 mr-2 rounded-full ${sistemaLigado ? 'bg-green-500' : 'bg-zinc-500'}`} />
-                          Ligar Sistema
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Estado Atual */}
-            <Card className="bg-zinc-800/50 border-zinc-700/50">
-              <CardHeader>
-                <CardTitle className="text-lg font-medium">Estado Atual</CardTitle>
-                <CardDescription>Status e estatísticas de operação</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {/* Status atual com badge de semáforo */}
-                  <div className="p-4 rounded-lg border border-zinc-700/30 bg-zinc-700/20">
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <h3 className="font-medium">Status do Sistema</h3>
-                        <p className="text-sm text-zinc-400 mt-1">
-                          {sistemaLigado ? 'Aceitando novas contagens' : 'Bloqueado para novas contagens'}
+           {isLoading && !systemConfig ? (
+             <div className="flex justify-center items-center h-64">
+               <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-[#F4C95D] border-r-2 border-b-2 border-transparent"></div>
+               <p className="ml-2">Carregando configurações...</p>
+             </div>
+           ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Card className="bg-zinc-800/50 border-zinc-700/50">
+                <CardHeader>
+                  <CardTitle className="text-lg font-medium">Modo de Operação do Sistema</CardTitle>
+                  <CardDescription>Defina como o sistema de contagem será ativado e desativado.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-6">
+                    <div className="flex items-center justify-between p-4 rounded-lg bg-zinc-700/20 border border-zinc-700/30">
+                      <div className="space-y-0.5">
+                        <Label htmlFor="modo-automatico-switch" className="text-base">Modo Automático</Label>
+                        <p className="text-sm text-zinc-400">
+                          O sistema liga e desliga conforme o agendamento.
                         </p>
                       </div>
-                      <Badge 
-                        className={`px-3 py-1 ${
-                          sistemaLigado ? 'bg-green-600/30 text-green-400 hover:bg-green-600/30' : 
-                          'bg-red-600/30 text-red-400 hover:bg-red-600/30'
-                        }`}
-                      >
-                        {sistemaLigado ? 'Online' : 'Offline'}
-                      </Badge>
+                      <Switch 
+                        id="modo-automatico-switch"
+                        checked={sistemaAutomatico} 
+                        onCheckedChange={handleModeChange}
+                        disabled={isLoading}
+                      />
                     </div>
-                  </div>
 
-                  {/* Progresso de inventário */}
-                  <div className="p-4 rounded-lg border border-zinc-700/30 bg-zinc-700/20">
-                    <div className="flex justify-between items-center mb-3">
-                      <div>
-                        <h3 className="font-medium">Progresso do Inventário</h3>
-                        <p className="text-sm text-zinc-400 mt-1">
-                          {lojasComContagem} de {totalLojas} lojas completaram
-                        </p>
+                    {sistemaAutomatico ? (
+                      <div className="border border-zinc-700/30 rounded-lg p-4 space-y-3">
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <h3 className="font-medium">Agendamento Atual</h3>
+                            <p className="text-sm text-zinc-400">
+                              Período em que o sistema estará ativo.
+                            </p>
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                                // Sincroniza o estado do formulário do diálogo com systemConfig antes de abrir
+                                setScheduleFormState({
+                                    modo: systemConfig?.modo || 'automatico',
+                                    dataInicio: systemConfig?.dataInicio || '',
+                                    horaInicio: systemConfig?.horaInicio || '',
+                                    dataFim: systemConfig?.dataFim || '',
+                                    horaFim: systemConfig?.horaFim || '',
+                                });
+                                setShowScheduleDialog(true);
+                            }}
+                            className="border-zinc-700 text-white hover:bg-zinc-700"
+                            disabled={isLoading}
+                          >
+                            <Calendar className="h-4 w-4 mr-1.5" />
+                            Configurar
+                          </Button>
+                        </div>
+                        {systemConfig?.dataInicio && systemConfig?.horaInicio && systemConfig?.dataFim && systemConfig?.horaFim ? (
+                           <div className="space-y-1 text-sm text-zinc-300">
+                           <p>De: <span className="font-medium text-white">{formatarDataBR(systemConfig.dataInicio)} às {formatarHora(systemConfig.horaInicio)}</span></p>
+                           <p>Até: <span className="font-medium text-white">{formatarDataBR(systemConfig.dataFim)} às {formatarHora(systemConfig.horaFim)}</span></p>
+                           <p>Status: <span className={dentroDoHorario && sistemaLigado ? "text-green-400" : "text-amber-400"}>{dentroDoHorario && sistemaLigado ? "Dentro do horário e Online" : "Fora do horário ou Offline"}</span></p>
+                         </div>
+                        ) : (
+                          <div className="bg-amber-900/20 text-amber-400 p-3 rounded-md text-sm">
+                            <AlertTriangle className="h-4 w-4 inline mr-1.5" />
+                            Agendamento não configurado.
+                          </div>
+                        )}
                       </div>
-                      <Badge className="bg-[#F4C95D]/30 text-[#F4C95D] hover:bg-[#F4C95D]/30 px-3 py-1">
-                        {progressoInventario.toFixed(1)}%
-                      </Badge>
-                    </div>
-                    <Progress value={progressoInventario} className="h-2.5 bg-zinc-700" />
+                    ) : ( // Modo Manual
+                      <div className="border border-zinc-700/30 rounded-lg p-4 space-y-3">
+                        <div>
+                          <h3 className="font-medium">Controle Manual do Sistema</h3>
+                          <p className="text-sm text-zinc-400">
+                            Ative ou desative o sistema manualmente.
+                          </p>
+                        </div>
+                        <div className="flex flex-col gap-3">
+                          <Button
+                            onClick={() => onToggleSystem(false)} // false para bloquear (desligar)
+                            className={`h-12 ${!sistemaLigado ? 'bg-red-700 hover:bg-red-800' : 'bg-zinc-600 hover:bg-zinc-700'} text-white`}
+                            disabled={!sistemaLigado || isLoading}
+                          >
+                             <div className={`h-2.5 w-2.5 mr-2 rounded-full ${!sistemaLigado ? 'bg-red-400' : 'bg-zinc-400'}`} />
+                            Desligar Sistema
+                          </Button>
+                          <Button
+                            onClick={() => onToggleSystem(true)} // true para desbloquear (ligar)
+                            className={`h-12 ${sistemaLigado ? 'bg-green-700 hover:bg-green-800' : 'bg-zinc-600 hover:bg-zinc-700'} text-white`}
+                            disabled={sistemaLigado || isLoading}
+                          >
+                             <div className={`h-2.5 w-2.5 mr-2 rounded-full ${sistemaLigado ? 'bg-green-400' : 'bg-zinc-400'}`} />
+                            Ligar Sistema
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                   </div>
+                </CardContent>
+                 <CardFooter className="text-xs text-zinc-500">
+                    O sistema é verificado automaticamente a cada minuto para garantir o estado correto conforme o modo e agendamento.
+                 </CardFooter>
+              </Card>
+              
+              <SystemMaintenanceCard 
+                 systemConfig={systemConfig} 
+                 contagensData={contagensData}
+                 onRefresh={onRefresh}
+               />
 
-                  <BatchGenerator 
-                    systemConfig={systemConfig} 
-                    onRefresh={handleRefresh}
-                  />
-
-                  {/* Estatísticas */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="p-3 rounded-lg border border-zinc-700/30 bg-zinc-700/20">
-                      <div className="text-xs text-zinc-400">Total Itens Contados</div>
-                      <div className="text-xl font-bold mt-1">
-                        {dadosAtivosPorContagem.reduce((sum, item) => sum + item.total, 0)}
-                      </div>
-                    </div>
-                    <div className="p-3 rounded-lg border border-zinc-700/30 bg-zinc-700/20">
-                      <div className="text-xs text-zinc-400">Média por Loja</div>
-                      <div className="text-xl font-bold mt-1">
-                        {(dadosAtivosPorContagem.reduce((sum, item) => sum + item.total, 0) / (lojasComContagem || 1)).toFixed(0)}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            
-            {/* System Maintenance Card */}
-            <SystemMaintenanceCard 
-              systemConfig={systemConfig} 
-              contagensData={contagensData}
-              onRefresh={onRefresh}
-            />
-          </div>
+            </div>
+           )}
         </TabsContent>
 
+
         <TabsContent value="management" className="mt-0">
-          {isLoading ? (
+          {isLoading && !systemConfig ? (
             <div className="flex justify-center items-center h-64">
-              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-[#F4C95D] border-r-2 border-b-2 border-transparent"></div>
-              <p className="ml-2">Carregando dados...</p>
-            </div>
+               <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-[#F4C95D] border-r-2 border-b-2 border-transparent"></div>
+               <p className="ml-2">Carregando dados de gerenciamento...</p>
+             </div>
           ) : (
             <div className="space-y-6">
-              {/* Seleção de Loja */}
               <Card className="bg-zinc-800/50 border-zinc-700/50">
                 <CardHeader className="pb-3">
                   <CardTitle className="text-lg font-medium">Gerenciamento de Contagens</CardTitle>
-                  <CardDescription>Edite ou remova contagens de lojas</CardDescription>
+                  <CardDescription>Visualize, edite ou remova contagens individuais.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="mb-6">
-                    <Label className="mb-2 block">Selecione uma loja para gerenciar</Label>
-                    <Select 
-                      onValueChange={(value) => {
-                        /* Implementar filtro de loja */
-                      }}
-                    >
-                      <SelectTrigger className="bg-zinc-800 border-zinc-700 h-10">
-                        <SelectValue placeholder="Todas as lojas" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-zinc-800 border-zinc-700">
-                        <SelectItem value="todas">Todas as lojas</SelectItem>
-                        {lojas.map((loja) => (
-                          <SelectItem key={loja.id} value={loja.id}>
-                            {loja.nome}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Tabela de Contagens */}
+                  {/* TODO: Adicionar filtros por loja, email, ativo, data */}
                   <div className="rounded-md border border-zinc-700 overflow-hidden">
-                    <div className="overflow-x-auto">
-                      <table className="w-full">
-                        <thead>
-                          <tr className="bg-zinc-800">
+                    <ScrollArea className="h-[500px]">
+                      <table className="w-full text-sm">
+                        <thead className="sticky top-0 bg-zinc-800 z-10">
+                          <tr>
                             <th className="text-left py-3 px-4 text-xs font-medium text-zinc-400">Loja</th>
                             <th className="text-left py-3 px-4 text-xs font-medium text-zinc-400">Email</th>
                             <th className="text-left py-3 px-4 text-xs font-medium text-zinc-400">Ativo</th>
-                            <th className="text-left py-3 px-4 text-xs font-medium text-zinc-400">Qtd.</th>
+                            <th className="text-center py-3 px-4 text-xs font-medium text-zinc-400">Qtd.</th>
                             <th className="text-left py-3 px-4 text-xs font-medium text-zinc-400">Data</th>
                             <th className="text-right py-3 px-4 text-xs font-medium text-zinc-400">Ações</th>
                           </tr>
                         </thead>
-                        <tbody>
-                          {contagensData.slice(0, 10).map((registro) => (
-                            <tr key={registro.id} className="border-t border-zinc-700 hover:bg-zinc-800/50">
-                              <td className="py-3 px-4 text-sm">{registro.loja_nome}</td>
-                              <td className="py-3 px-4 text-sm">{registro.email}</td>
-                              <td className="py-3 px-4 text-sm">{registro.ativo_nome}</td>
-                              <td className="py-3 px-4 text-sm">
-                                <Badge variant="outline" className="bg-zinc-800 font-mono">
+                        <tbody className="divide-y divide-zinc-700/50">
+                          {contagensData.length > 0 ? contagensData.map((registro) => (
+                            <tr key={registro.id} className="hover:bg-zinc-800/50">
+                              <td className="py-2.5 px-4">{registro.loja_nome}</td>
+                              <td className="py-2.5 px-4 text-zinc-400">{registro.email}</td>
+                              <td className="py-2.5 px-4">{registro.ativo_nome}</td>
+                              <td className="py-2.5 px-4 text-center">
+                                <Badge variant="secondary" className="bg-zinc-700 text-zinc-300 font-mono">
                                   {registro.quantidade}
                                 </Badge>
                               </td>
-                              <td className="py-3 px-4 text-sm text-zinc-400">
+                              <td className="py-2.5 px-4 text-zinc-400 text-xs">
                                 {formatarData(registro.data_registro)}
                               </td>
-                              <td className="py-3 px-4 text-sm text-right">
-                                <div className="flex items-center justify-end gap-2">
+                              <td className="py-2.5 px-4 text-right">
+                                <div className="flex items-center justify-end gap-1">
                                   <Button
                                     variant="ghost"
                                     size="icon"
-                                    onClick={() => handleEditContagem(registro)}
-                                    className="h-8 w-8 text-zinc-400 hover:text-white hover:bg-zinc-700"
+                                    onClick={() => handleEditContagemClick(registro)}
+                                    className="h-7 w-7 text-zinc-400 hover:text-[#F4C95D] hover:bg-zinc-700"
+                                    title="Editar contagem"
                                   >
                                     <PencilLine className="h-4 w-4" />
                                   </Button>
@@ -1044,16 +948,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                       <Button
                                         variant="ghost"
                                         size="icon"
-                                        className="h-8 w-8 text-zinc-400 hover:text-red-400 hover:bg-red-900/20"
+                                        className="h-7 w-7 text-zinc-400 hover:text-red-400 hover:bg-red-900/20"
+                                        title="Remover contagem"
                                       >
                                         <Trash2 className="h-4 w-4" />
                                       </Button>
                                     </AlertDialogTrigger>
                                     <AlertDialogContent className="bg-zinc-900 text-white border-zinc-800">
                                       <AlertDialogHeader>
-                                        <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
+                                        <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
                                         <AlertDialogDescription className="text-zinc-400">
-                                          Tem certeza que deseja excluir esta contagem? Esta ação não pode ser desfeita.
+                                          Tem certeza que deseja excluir esta contagem ({registro.ativo_nome} - {registro.loja_nome})? Esta ação não pode ser desfeita.
                                         </AlertDialogDescription>
                                       </AlertDialogHeader>
                                       <AlertDialogFooter>
@@ -1072,131 +977,62 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                 </div>
                               </td>
                             </tr>
-                          ))}
-                          {contagensData.length === 0 && (
+                          )) : (
                             <tr>
-                              <td colSpan={6} className="py-6 text-center text-zinc-400">
-                                Nenhuma contagem encontrada
+                              <td colSpan={6} className="py-10 text-center text-zinc-500">
+                                Nenhuma contagem encontrada.
                               </td>
                             </tr>
                           )}
                         </tbody>
                       </table>
-                    </div>
-                    {contagensData.length > 10 && (
-                      <div className="p-3 text-center text-zinc-400 border-t border-zinc-700 text-sm">
-                        Mostrando 10 de {contagensData.length} contagens
-                      </div>
-                    )}
+                    </ScrollArea>
                   </div>
                 </CardContent>
-              </Card>
-
-              {/* Gerenciamento de Lojas */}
-              <Card className="bg-zinc-800/50 border-zinc-700/50">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-lg font-medium">Lojas com Contagem Concluída</CardTitle>
-                  <CardDescription>Lojas que já finalizaram o inventário</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <ScrollArea className="h-72 rounded-md border border-zinc-700 p-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {Array.from(new Set(contagensData.map(c => c.loja))).map(lojaId => {
-                        const loja = lojas.find(l => l.id === lojaId);
-                        const lojaContagens = contagensData.filter(c => c.loja === lojaId);
-                        const ultimaContagem = new Date(Math.max(...lojaContagens.map(c => new Date(c.data_registro).getTime())));
-                        
-                        return (
-                          <div key={lojaId} className="flex justify-between items-center p-3 bg-zinc-800 rounded-lg border border-zinc-700/30">
-                            <div>
-                              <div className="font-medium">{loja ? loja.nome : lojaId}</div>
-                              <div className="text-xs text-zinc-400 mt-1">
-                                {formatarData(ultimaContagem)}
-                              </div>
-                            </div>
-                            <Popover>
-                              <PopoverTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-8 px-2 text-zinc-400 hover:text-white hover:bg-zinc-700"
-                                >
-                                  Detalhes
-                                </Button>
-                              </PopoverTrigger>
-                              <PopoverContent className="w-80 bg-zinc-800 border-zinc-700" align="end">
-                                <div className="space-y-2">
-                                  <h4 className="font-medium">Detalhes da Contagem</h4>
-                                  <div className="grid grid-cols-2 gap-2 text-sm">
-                                    <div className="text-zinc-400">Total de Registros:</div>
-                                    <div>{lojaContagens.length}</div>
-                                    <div className="text-zinc-400">Email Responsável:</div>
-                                    <div>{lojaContagens[0]?.email}</div>
-                                    <div className="text-zinc-400">Data da Contagem:</div>
-                                    <div>{formatarData(ultimaContagem)}</div>
-                                  </div>
-                                </div>
-                              </PopoverContent>
-                            </Popover>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </ScrollArea>
-                </CardContent>
-                <CardFooter className="text-zinc-400 text-sm">
-                  Total: {Array.from(new Set(contagensData.map(c => c.loja))).length} lojas concluídas
-                </CardFooter>
+                 <CardFooter className="text-xs text-zinc-500">
+                    Total de {contagensData.length} registros de contagem de inventário.
+                 </CardFooter>
               </Card>
             </div>
           )}
         </TabsContent>
       </Tabs>
 
-      {/* Using the new ScheduleConfigDialog component */}
-      <ScheduleConfigDialog
+      <ScheduleConfigDialogComponent
         open={showScheduleDialog}
         onOpenChange={setShowScheduleDialog}
-        initialConfig={scheduleForm}
-        onSave={handleSaveSchedule}
+        initialConfig={scheduleFormState} // Usa o estado local do AdminDashboard para o diálogo
+        onSave={handleSaveScheduleDialog} // Esta função chama props.onUpdateSchedule
       />
 
-      {/* Diálogo de Edição de Contagem */}
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
         <DialogContent className="bg-zinc-900 text-white border-zinc-800">
           <DialogHeader>
             <DialogTitle>Editar Contagem</DialogTitle>
-            <DialogDescription className="text-zinc-400">
-              Modifique a quantidade contada para este item
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4">
             {editingContagem && (
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="p-3 rounded-md bg-zinc-800 border border-zinc-700">
-                    <div className="text-xs text-zinc-400">Loja</div>
-                    <div className="mt-1">{editingContagem.loja_nome}</div>
-                  </div>
-                  <div className="p-3 rounded-md bg-zinc-800 border border-zinc-700">
-                    <div className="text-xs text-zinc-400">Item</div>
-                    <div className="mt-1">{editingContagem.ativo_nome}</div>
-                  </div>
+              <DialogDescription className="text-zinc-400">
+                Modificando quantidade para {editingContagem.ativo_nome} na loja {editingContagem.loja_nome}.
+              </DialogDescription>
+            )}
+          </DialogHeader>
+          <div className="py-4 space-y-3">
+            {editingContagem && (
+              <>
+                <div className="p-3 rounded-md bg-zinc-800 border border-zinc-700 text-sm">
+                  <span className="text-zinc-400">Data Original: </span>{formatarData(editingContagem.data_registro)}
                 </div>
-                <div className="p-3 rounded-md bg-zinc-800 border border-zinc-700">
-                  <div className="text-xs text-zinc-400">Data do Registro</div>
-                  <div className="mt-1">{formatarData(editingContagem.data_registro)}</div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Nova Quantidade</Label>
+                <div>
+                  <Label htmlFor="editQuantidade" className="text-base">Nova Quantidade</Label>
                   <Input
+                    id="editQuantidade"
                     type="number"
                     value={editForm.quantidade}
-                    onChange={(e) => setEditForm({...editForm, quantidade: parseInt(e.target.value) || 0})}
-                    className="bg-zinc-800 border-zinc-700"
+                    onChange={(e) => setEditForm({...editForm, quantidade: parseInt(e.target.value, 10) || 0})}
+                    className="bg-zinc-800 border-zinc-700 h-12 mt-1"
+                    autoFocus
                   />
                 </div>
-              </div>
+              </>
             )}
           </div>
           <DialogFooter>
@@ -1211,7 +1047,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
               onClick={handleSaveEdit}
               className="bg-[#F4C95D] hover:bg-[#e5bb4e] text-black"
             >
-              Salvar
+              Salvar Alterações
             </Button>
           </DialogFooter>
         </DialogContent>
