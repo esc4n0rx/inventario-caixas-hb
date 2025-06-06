@@ -32,6 +32,7 @@ type Store = {
   setCountType: (type: "estoque" | "transito" | null) => void
   checkSystemStatus: () => Promise<void>
   checkLojaStatus: (lojaId: string) => Promise<boolean>
+  resetCountFlow: () => void // <-- ADICIONE ESTA LINHA
 }
 
 export const useStore = create<Store>()(
@@ -65,6 +66,14 @@ export const useStore = create<Store>()(
       
       resetContagemTransito: () => set({ contagemTransito: {} }),
       
+      // FUNÇÃO DE RESET ADICIONADA AQUI
+      resetCountFlow: () => set({ 
+        countType: null, 
+        transitoCompleted: false, 
+        contagem: {}, 
+        contagemTransito: {} 
+      }),
+      
       setIsBlocked: (blocked) => set({ isBlocked: blocked }),
       
       setIsLojaBlocked: (blocked) => set({ isLojaBlocked: blocked }),
@@ -93,7 +102,6 @@ export const useStore = create<Store>()(
         try {
           if (!lojaId) return false;
           
-          // Verificar se a loja já fez contagem
           const { data, error, count } = await supabase
             .from('contagens')
             .select('id', { count: 'exact' })

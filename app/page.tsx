@@ -44,7 +44,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true)
   const router = useRouter()
   const { toast } = useToast()
-  const { setUserData, isBlocked, checkSystemStatus, checkLojaStatus } = useStore()
+  const { setUserData, isBlocked, checkSystemStatus, checkLojaStatus, resetCountFlow } = useStore()
 
   useEffect(() => {
     const loadSystemStatus = async () => {
@@ -107,6 +107,8 @@ export default function Home() {
       setShowLojaWarning(true);
       return;
     }
+    
+    resetCountFlow();
     
     setShowConfirmation(false)
     router.push("/contagem")

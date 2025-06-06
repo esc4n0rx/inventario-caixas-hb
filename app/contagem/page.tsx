@@ -62,7 +62,8 @@ export default function Contagem() {
     },
   })
 
-  const isCdLocation = userData?.loja === "92" || userData?.loja === "93" // CD SP ou CD ES
+  const isCdLocation = userData?.lojaName === "CD ES" || userData?.lojaName === "CD SP"
+  console.log("isCdLocation:", isCdLocation)
   const APP_VERSION = "1.2.0"; // Versão do sistema
 
   useEffect(() => {
