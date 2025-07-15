@@ -1,3 +1,4 @@
+// app/admin/page.tsx
 "use client"
 
 import { useState, useEffect, useCallback, useMemo } from "react"
@@ -6,16 +7,18 @@ import { motion } from "framer-motion"
 import { z } from "zod"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { ShieldAlert, ArrowLeft } from "lucide-react"
+import { ShieldAlert, ArrowLeft, Settings, Database, Webhook, Zap } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/components/ui/use-toast"
 import { useStore } from "@/lib/store"
 import { supabase } from '@/lib/supabase'
 import AdminDashboard, { SystemConfig as AdminSystemConfig } from "@/components/AdminDashboard"
-
+import { WebhookConfiguration } from "@/components/WebhookConfiguration"
+import BatchGenerator from "@/components/BatchGenerator"
 
 const APP_VERSION = "1.2.0"
 const ADMIN_PASSWORD_KEY = process.env.ADMIN_PASSWORD || "admin_password"
@@ -75,139 +78,124 @@ export default function Admin() {
 
   // Função utilitária para obter senha do localStorage de forma segura
   const getStoredPassword = useCallback(() => {
-    return typeof window !== 'undefined' ? localStorage.getItem(ADMIN_PASSWORD_KEY) || '' : ''
+    return typeof window !== 'undefined' ? 
+      (localStorage.getItem(ADMIN_PASSWORD_KEY) || '') : ''
   }, [])
 
-  // Parser de configuração do sistema - memoizado para evitar recálculos
-  const parseSystemConfig = useCallback((configData: ConfigData[]): AdminSystemConfig => {
-    const configMap = configData.reduce((acc, item) => {
-      acc[item.chave] = item.valor
-      return acc
-    }, {} as Record<string, string>)
-    
-    return {
-      bloqueado: configMap['sistema_bloqueado'] === 'true',
-      modo: (configMap['sistema_modo'] || 'manual') as 'automatico' | 'manual',
-      dataInicio: configMap['data_inicio'] || '',
-      horaInicio: configMap['hora_inicio'] || '',
-      dataFim: configMap['data_fim'] || '',
-      horaFim: configMap['hora_fim'] || ''
-    }
-  }, [])
-
-  // Função para buscar contagens - otimizada com useCallback
-  const fetchContagens = useCallback(async (): Promise<void> => {
+  // Função para buscar dados do sistema
+  const fetchSystemData = useCallback(async () => {
     try {
-      const { data, error } = await supabase
+      console.log("AdminPage: fetchSystemData iniciado")
+      setIsLoading(true)
+      
+      // Buscar configurações do sistema
+      const configResponse = await fetch('/api/sistema/config')
+      const configData = await configResponse.json()
+      
+      if (configData.success) {
+        setSystemConfig(configData.config)
+        console.log("AdminPage: Sistema config carregado:", configData.config)
+      } else {
+        console.error("AdminPage: Erro ao carregar config do sistema:", configData.error)
+      }
+      
+      // Buscar contagens
+      const { data: contagens, error: contagensError } = await supabase
         .from('contagens')
         .select('*')
         .order('data_registro', { ascending: false })
       
-      if (error) throw error
+      if (contagensError) {
+        console.error("AdminPage: Erro ao buscar contagens:", contagensError)
+        throw contagensError
+      }
       
-      setContagensData(data || [])
-    } catch (error) {
-      console.error('Erro ao buscar contagens:', error)
-      toast({
-        title: "Erro",
-        description: "Não foi possível carregar as contagens.",
-        variant: "destructive",
-      })
-    }
-  }, [toast])
-
-  // Função para buscar contagens de trânsito - otimizada com useCallback
-  const fetchContagensTransito = useCallback(async (): Promise<void> => {
-    try {
-      const { data, error } = await supabase
+      setContagensData(contagens || [])
+      console.log("AdminPage: Contagens carregadas:", contagens?.length || 0)
+      
+      // Buscar contagens de trânsito
+      const { data: contagensTransito, error: transitoError } = await supabase
         .from('contagens_transito')
         .select('*')
         .order('data_registro', { ascending: false })
       
-      if (error) throw error
-      
-      setContagensTransitoData(data || [])
-    } catch (error) {
-      console.error('Erro ao buscar contagens de trânsito:', error)
-      toast({
-        title: "Erro",
-        description: "Não foi possível carregar as contagens de trânsito.",
-        variant: "destructive",
-      })
-    }
-  }, [toast])
-
-  // Função principal para buscar dados do sistema - otimizada
-  const fetchSystemData = useCallback(async (): Promise<void> => {
-    setIsLoading(true)
-    console.log("AdminPage: fetchSystemData iniciado")
-    
-    try {
-      // Busca configuração do sistema
-      const { data: configData, error: configError } = await supabase
-        .from('configuracao_sistema')
-        .select('*')
-      
-      if (configError) {
-        console.error("AdminPage: Erro ao buscar configData do Supabase:", configError)
-        throw configError
+      if (transitoError) {
+        console.error("AdminPage: Erro ao buscar contagens de trânsito:", transitoError)
+        throw transitoError
       }
       
-      console.log("AdminPage: Dados de configuração obtidos:", configData)
-
-      // Parse da configuração usando a função memoizada
-      const parsedConfig = parseSystemConfig(configData || [])
-      console.log("AdminPage: Configuração do sistema parseada:", parsedConfig)
-      
-      // Atualiza estados
-      setSystemConfig(parsedConfig)
-      setIsBlocked(parsedConfig.bloqueado)
-      
-      // Busca dados de contagens em paralelo para melhor performance
-      await Promise.all([
-        fetchContagens(),
-        fetchContagensTransito()
-      ])
+      setContagensTransitoData(contagensTransito || [])
+      console.log("AdminPage: Contagens de trânsito carregadas:", contagensTransito?.length || 0)
       
     } catch (error) {
       console.error('AdminPage: Erro ao buscar dados do sistema:', error)
       toast({
-        title: "Erro ao carregar dados",
-        description: "Não foi possível carregar todas as informações do sistema.",
+        title: "Erro",
+        description: "Não foi possível carregar os dados do sistema.",
         variant: "destructive",
       })
     } finally {
       setIsLoading(false)
-      console.log("AdminPage: fetchSystemData finalizado")
     }
-  }, [parseSystemConfig, fetchContagens, fetchContagensTransito, setIsBlocked, toast])
+  }, [toast])
 
-  // Effect para carregar dados quando autenticado
+  // Verificar autenticação ao carregar
   useEffect(() => {
-    if (isAuthenticated) {
-      fetchSystemData()
+    const checkAuth = async () => {
+      const storedPassword = getStoredPassword()
+      if (storedPassword) {
+        try {
+          const response = await fetch('/api/sistema/atualizar', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ bloqueado: false, senha: storedPassword }),
+          })
+          
+          if (response.ok) {
+            setIsAuthenticated(true)
+            await fetchSystemData()
+          } else {
+            localStorage.removeItem(ADMIN_PASSWORD_KEY)
+            setIsLoading(false)
+          }
+        } catch (error) {
+          console.error('Erro na verificação de autenticação:', error)
+          localStorage.removeItem(ADMIN_PASSWORD_KEY)
+          setIsLoading(false)
+        }
+      } else {
+        setIsLoading(false)
+      }
     }
-  }, [isAuthenticated, fetchSystemData])
+    
+    checkAuth()
+  }, [getStoredPassword, fetchSystemData])
 
-  // Função de login - otimizada com tratamento de erro aprimorado
-  const onSubmitLogin = useCallback(async (values: z.infer<typeof formSchema>): Promise<void> => {
+  // Função para ir para a página inicial
+  const handleGoBack = useCallback(() => {
+    router.push("/")
+  }, [router])
+
+  // Função para fazer login
+  const onSubmitLogin = useCallback(async (values: z.infer<typeof formSchema>) => {
     try {
-      const response = await fetch('/api/admin/verificar', {
+      const response = await fetch('/api/sistema/atualizar', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ senha: values.password }),
+        body: JSON.stringify({ bloqueado: false, senha: values.password }),
       })
-      
-      const data = await response.json()
-      
-      if (data.autorizado) {
+
+      if (response.ok) {
         localStorage.setItem(ADMIN_PASSWORD_KEY, values.password)
         setIsAuthenticated(true)
+        await fetchSystemData()
         toast({
           title: "Autenticado com sucesso",
-          description: "Bem-vindo à área administrativa.",
+          description: "Bem-vindo ao painel administrativo.",
         })
       } else {
         toast({
@@ -224,9 +212,9 @@ export default function Admin() {
         variant: "destructive",
       })
     }
-  }, [toast])
+  }, [fetchSystemData, toast])
 
-  // Função para atualizar agendamento - otimizada
+  // Função para atualizar agendamento
   const handleUpdateSchedule = useCallback(async (newScheduleData: Partial<AdminSystemConfig>): Promise<void> => {
     try {
       console.log("AdminPage: handleUpdateSchedule chamado com:", newScheduleData)
@@ -240,7 +228,6 @@ export default function Admin() {
         horaFim: ''
       }
       
-      // Merge dos dados novos com configuração atual
       const payload: Partial<AdminSystemConfig> = {
         modo: newScheduleData.modo ?? currentConfig.modo,
         dataInicio: newScheduleData.dataInicio ?? currentConfig.dataInicio,
@@ -276,7 +263,6 @@ export default function Admin() {
         description: "As configurações de agendamento foram atualizadas com sucesso.",
       })
       
-      // Re-fetch para obter o estado mais recente
       await fetchSystemData()
       
     } catch (error) {
@@ -289,83 +275,55 @@ export default function Admin() {
     }
   }, [systemConfig, getStoredPassword, toast, fetchSystemData])
 
-  // Função para alternar estado do sistema - otimizada
-  const handleToggleSystem = useCallback(async (ativar: boolean, showToast = true): Promise<void> => {
-    console.log(`AdminPage: handleToggleSystem chamado com ativar=${ativar}`)
-    
+  // Função para alternar sistema
+  const handleToggleSystem = useCallback(async (bloqueado: boolean) => {
     try {
       const response = await fetch('/api/sistema/atualizar', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          bloqueado: !ativar,
-          senha: getStoredPassword()
-        }),
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        console.error("AdminPage: Erro na resposta de /api/sistema/atualizar:", errorData)
-        throw new Error(errorData.error || 'Erro ao alterar estado do sistema')
-      }
-      
-      const data = await response.json()
-      console.log("AdminPage: Resposta de sucesso de /api/sistema/atualizar:", data)
-
-      // Atualização otimista do estado local
-      setSystemConfig(prev => {
-        if (!prev) return null
-        return {
-          ...prev,
-          bloqueado: !ativar,
-          modo: 'manual' as const
-        }
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ bloqueado, senha: getStoredPassword() }),
       })
       
-      setIsBlocked(!ativar)
-      
-      if (showToast) {
+      if (response.ok) {
+        setIsBlocked(bloqueado)
+        await fetchSystemData()
         toast({
-          title: ativar ? "Sistema Ligado (Manual)" : "Sistema Desligado (Manual)",
-          description: ativar 
-            ? "O sistema está aberto para contagens." 
-            : "O sistema está bloqueado para contagens.",
+          title: bloqueado ? "Sistema bloqueado" : "Sistema desbloqueado",
+          description: bloqueado 
+            ? "O sistema foi bloqueado para contagens" 
+            : "O sistema foi desbloqueado para contagens",
         })
+      } else {
+        throw new Error('Erro ao atualizar sistema')
       }
-      
-      // Re-fetch para garantir sincronização
-      await fetchSystemData()
-
     } catch (error) {
-      console.error('AdminPage: Erro ao alterar estado do sistema:', error)
-      if (showToast) {
-        toast({
-          title: "Erro",
-          description: "Não foi possível alterar o estado do sistema.",
-          variant: "destructive",
-        })
-      }
-    }
-  }, [getStoredPassword, setIsBlocked, toast, fetchSystemData])
-
-  // Função para remover contagem - otimizada
-  const handleRemoveContagem = useCallback(async (id: string | number): Promise<void> => {
-    try {
-      const response = await fetch(`/api/contagens/manage?id=${id}&senha=${getStoredPassword()}`, {
-        method: 'DELETE',
+      console.error('Erro ao alternar sistema:', error)
+      toast({
+        title: "Erro",
+        description: "Não foi possível alterar o estado do sistema.",
+        variant: "destructive",
       })
+    }
+  }, [getStoredPassword, setIsBlocked, fetchSystemData, toast])
 
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Erro ao remover contagem')
-      }
+  // Função para remover contagem
+  const handleRemoveContagem = useCallback(async (id: string, tipo: 'contagem' | 'transito') => {
+    try {
+      const tabela = tipo === 'contagem' ? 'contagens' : 'contagens_transito'
+      const { error } = await supabase
+        .from(tabela)
+        .delete()
+        .eq('id', id)
       
+      if (error) throw error
+      
+      await fetchSystemData()
       toast({
         title: "Contagem removida",
         description: "A contagem foi removida com sucesso.",
       })
-      
-      await fetchContagens()
     } catch (error) {
       console.error('Erro ao remover contagem:', error)
       toast({
@@ -374,32 +332,24 @@ export default function Admin() {
         variant: "destructive",
       })
     }
-  }, [getStoredPassword, toast, fetchContagens])
+  }, [fetchSystemData, toast])
 
-  // Função para editar contagem - otimizada
-  const handleEditContagem = useCallback(async (id: string | number, quantidade: number): Promise<void> => {
+  // Função para editar contagem
+  const handleEditContagem = useCallback(async (id: string, novaQuantidade: number, tipo: 'contagem' | 'transito') => {
     try {
-      const response = await fetch('/api/contagens/manage', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          id, 
-          quantidade, 
-          senha: getStoredPassword()
-        }),
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Erro ao atualizar contagem')
-      }
+      const tabela = tipo === 'contagem' ? 'contagens' : 'contagens_transito'
+      const { error } = await supabase
+        .from(tabela)
+        .update({ quantidade: novaQuantidade })
+        .eq('id', id)
       
+      if (error) throw error
+      
+      await fetchSystemData()
       toast({
         title: "Contagem atualizada",
-        description: "A contagem foi atualizada com sucesso.",
+        description: "A quantidade foi atualizada com sucesso.",
       })
-      
-      await fetchContagens()
     } catch (error) {
       console.error('Erro ao editar contagem:', error)
       toast({
@@ -408,17 +358,23 @@ export default function Admin() {
         variant: "destructive",
       })
     }
-  }, [getStoredPassword, toast, fetchContagens])
+  }, [fetchSystemData, toast])
 
-  // Função para voltar à página inicial - memoizada
-  const handleGoBack = useCallback(() => {
-    router.push("/")
-  }, [router])
+  // Adapte para contagem normal
+  const handleRemoveContagemWrapper = useCallback(
+    (id: string) => handleRemoveContagem(id, "contagem"),
+    [handleRemoveContagem]
+  );
 
-  // Estilos do background memoizados para evitar recriação
+  const handleEditContagemWrapper = useCallback(
+    (id: string, quantidade: number) => handleEditContagem(id, quantidade, "contagem"),
+    [handleEditContagem]
+  );
+
+  // Estilo do background
   const backgroundStyle = useMemo(() => ({
     backgroundImage: "url('/fundo-login.png')",
-    opacity: 0.1,
+    opacity: 0.3,
   }), [])
 
   // Renderização do formulário de login
@@ -427,24 +383,19 @@ export default function Admin() {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
-      className="z-10 w-full max-w-md"
+      className="z-10 w-full max-w-md mx-auto"
     >
-      <Card className="bg-[#2C2C2C] text-white border-none shadow-xl rounded-xl overflow-hidden">
-        <CardHeader className="space-y-3 pt-8 pb-6 px-8">
-          <div className="flex justify-center mb-3">
-            <div className="p-4 bg-zinc-800/80 rounded-full">
-              <ShieldAlert className="h-16 w-16 text-[#F4C95D]" />
-            </div>
+      <Card className="bg-[#232323] text-white border-none shadow-2xl rounded-2xl overflow-hidden">
+        <CardHeader className="space-y-2 items-center text-center pb-6 pt-8">
+          <div className="flex items-center justify-center mb-4">
+            <ShieldAlert className="h-10 w-10 text-[#F4C95D]" />
           </div>
-          <CardTitle className="text-3xl font-bold text-center">
-            Área Administrativa
-          </CardTitle>
-          <CardDescription className="text-zinc-400 text-lg text-center">
-            Digite a senha para acessar o painel administrativo.
+          <CardTitle className="text-2xl font-bold">Acesso Administrativo</CardTitle>
+          <CardDescription className="text-zinc-400 text-base">
+            Digite a senha para acessar o painel administrativo
           </CardDescription>
         </CardHeader>
-        
-        <CardContent className="px-8 pb-8">
+        <CardContent className="px-4 sm:px-8 pb-8">
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmitLogin)} className="space-y-6">
               <FormField
@@ -458,7 +409,7 @@ export default function Admin() {
                         type="password"
                         placeholder="Digite a senha de administrador"
                         {...field}
-                        className="bg-zinc-800 border-zinc-700 h-12 text-base"
+                        className="bg-zinc-800 border-zinc-700 h-12 text-base focus:ring-2 focus:ring-[#F4C95D] focus:border-[#F4C95D]"
                       />
                     </FormControl>
                     <FormMessage className="text-base" />
@@ -467,13 +418,12 @@ export default function Admin() {
               />
               <Button 
                 type="submit" 
-                className="w-full bg-[#F4C95D] hover:bg-[#e5bb4e] text-black h-14 text-lg font-medium mt-6"
+                className="w-full bg-[#F4C95D] hover:bg-[#e5bb4e] text-black h-14 text-lg font-medium mt-6 rounded-lg shadow-md transition-all"
               >
                 Acessar Dashboard
               </Button>
             </form>
           </Form>
-          
           <div className="mt-6 text-center">
             <Button
               variant="ghost"
@@ -486,8 +436,7 @@ export default function Admin() {
             </Button>
           </div>
         </CardContent>
-        
-        <div className="px-8 py-3 bg-zinc-900/50 border-t border-zinc-800 flex justify-center">
+        <div className="px-4 sm:px-8 py-3 bg-zinc-900/60 border-t border-zinc-800 flex justify-center">
           <p className="text-zinc-500 text-sm">
             ColheitaCerta v{APP_VERSION} - Painel Administrativo
           </p>
@@ -498,34 +447,97 @@ export default function Admin() {
 
   // Renderização do dashboard administrativo
   const renderDashboard = () => (
-    <div className="z-10 relative w-full h-screen overflow-hidden flex flex-col">
-      <div className="container mx-auto p-4 sm:p-6 h-full overflow-y-auto scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-zinc-800">
-        <AdminDashboard
-          contagensData={contagensData}
-          contagensTransitoData={contagensTransitoData}
-          systemConfig={systemConfig}
-          isLoading={isLoading}
-          onRefresh={fetchSystemData}
-          onUpdateSchedule={handleUpdateSchedule}
-          onToggleSystem={handleToggleSystem}
-          onRemoveContagem={handleRemoveContagem}
-          onEditContagem={handleEditContagem}
-        />
+    <div className="z-10 relative w-full max-w-7xl mx-auto flex flex-col min-h-[80vh] pb-8">
+      <div className="w-full px-2 sm:px-4 md:px-8 pt-4">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-6">
+          <h1 className="text-2xl sm:text-3xl font-bold text-white text-center sm:text-left">Painel Administrativo</h1>
+          <Button 
+            variant="outline" 
+            onClick={handleGoBack}
+            className="border-zinc-700 text-white hover:bg-zinc-800"
+          >
+            Voltar ao Sistema
+          </Button>
+        </div>
+        <Tabs defaultValue="sistema" className="space-y-6 w-full">
+          <TabsList className="grid w-full grid-cols-1 sm:grid-cols-3 bg-zinc-800 border-zinc-700 rounded-lg overflow-hidden">
+            <TabsTrigger 
+              value="sistema" 
+              className="data-[state=active]:bg-[#F4C95D] data-[state=active]:text-black"
+            >
+              <Settings className="h-4 w-4 mr-2" />
+              Sistema
+            </TabsTrigger>
+            <TabsTrigger 
+              value="webhook" 
+              className="data-[state=active]:bg-[#F4C95D] data-[state=active]:text-black"
+            >
+              <Webhook className="h-4 w-4 mr-2" />
+              Webhook
+            </TabsTrigger>
+            <TabsTrigger 
+              value="lote" 
+              className="data-[state=active]:bg-[#F4C95D] data-[state=active]:text-black"
+            >
+              <Zap className="h-4 w-4 mr-2" />
+              Lote
+            </TabsTrigger>
+          </TabsList>
+          <div className="w-full min-h-[400px] bg-zinc-900/70 rounded-b-xl rounded-tr-xl shadow-lg p-2 sm:p-6 mt-0">
+            <TabsContent value="sistema">
+              <AdminDashboard
+                contagensData={contagensData}
+                contagensTransitoData={contagensTransitoData}
+                systemConfig={systemConfig}
+                isLoading={isLoading}
+                onRefresh={fetchSystemData}
+                onUpdateSchedule={handleUpdateSchedule}
+                onToggleSystem={handleToggleSystem}
+                onRemoveContagem={handleRemoveContagemWrapper}
+                onEditContagem={handleEditContagemWrapper}
+              />
+            </TabsContent>
+            <TabsContent value="webhook">
+              <WebhookConfiguration adminPassword={getStoredPassword()} />
+            </TabsContent>
+            <TabsContent value="lote">
+              <BatchGenerator 
+                systemConfig={systemConfig}
+                onRefresh={fetchSystemData}
+              />
+            </TabsContent>
+          </div>
+        </Tabs>
       </div>
     </div>
   )
 
+  // Loading inicial
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-zinc-900 via-zinc-800 to-zinc-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-[#F4C95D] border-r-2 border-b-2 border-transparent mx-auto mb-4"></div>
+          <p className="text-white text-lg">Carregando...</p>
+        </div>
+      </div>
+    )
+  }
+
   // Renderização principal
   return (
-    <div className="relative w-full h-screen flex items-center justify-center bg-zinc-900 text-white">
+    <div className="relative min-h-screen w-full flex flex-col bg-gradient-to-br from-zinc-900 via-zinc-800 to-zinc-900 text-white overflow-x-hidden">
       {/* Background com imagem */}
       <div
-        className="absolute inset-0 bg-cover bg-center z-0"
+        className="fixed inset-0 bg-cover bg-center z-0 pointer-events-none"
         style={backgroundStyle}
+        aria-hidden="true"
       />
 
       {/* Conteúdo condicional baseado no estado de autenticação */}
-      {!isAuthenticated ? renderLoginForm() : renderDashboard()}
+      <main className="relative flex-1 flex flex-col items-center justify-center z-10 px-2 py-6 sm:px-4 md:px-8 lg:px-0 w-full max-w-full min-h-screen overflow-y-auto">
+        {!isAuthenticated ? renderLoginForm() : renderDashboard()}
+      </main>
     </div>
   )
 }

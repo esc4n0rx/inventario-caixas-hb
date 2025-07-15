@@ -1,3 +1,4 @@
+// lib/types.ts
 export interface Inventario {
   id: string
   codigo: string
@@ -57,4 +58,24 @@ export interface Relatorio {
   dataGeracao: string
   tipo: "atual" | "comparativo"
   dados: any
+}
+
+// Novos tipos para webhook
+export interface WebhookConfig {
+  id?: number
+  url: string
+  token: string
+  enabled: boolean
+  last_updated?: string
+}
+
+export interface WebhookPayload {
+  contagens: Array<{
+    email: string
+    ativo_nome: string
+    quantidade: number
+    loja_nome: string
+    tipo: 'loja' | 'transito'
+    obs?: string
+  }>
 }

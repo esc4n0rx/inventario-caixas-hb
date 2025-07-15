@@ -122,7 +122,7 @@ export default function Contagem() {
 
   const handleSubmitFinal = async () => {
     setIsSubmitting(true);
-
+  
     try {
       const { data: configData, error: configError } = await supabase
         .from('configuracao_sistema')
@@ -142,8 +142,8 @@ export default function Contagem() {
         router.push("/");
         return;
       }
-
-        const { data: contagemData, count } = await supabase
+  
+      const { data: contagemData, count } = await supabase
         .from('contagens')
         .select('id', { count: 'exact' })
         .eq('loja', userData.loja)
@@ -180,6 +180,7 @@ export default function Contagem() {
         quantidade: contagem[ativo.id] || 0
       }));
       
+      // Inserir contagem principal
       const { error } = await supabase
         .from('contagens')
         .insert(registros);
@@ -187,13 +188,14 @@ export default function Contagem() {
       if (error) throw error;
       
       setShowReview(false);
-
+  
+      // Para CD SP ou CD ES, verificar se precisa fazer contagem de trânsito
       if (isCdLocation && countType === "estoque" && !transitoCompleted) {
         setShowTransitoCount(true);
         setIsSubmitting(false);
         return;
       }
-
+  
       toast({
         title: "Contagem enviada com sucesso!",
         description: "Obrigado por completar o inventário.",
@@ -211,7 +213,7 @@ export default function Contagem() {
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }
 
   const updateReviewItem = (id: string, value: number) => {
     setContagem(id, value);

@@ -1,8 +1,9 @@
-
+// app/api/contagem/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { ativos } from '@/data/ativos';
 import { lojas } from '@/data/lojas';
+import { sendIndividualWebhooks } from '@/lib/webhook';
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,7 +15,8 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-    
+
+    // Verificar se o sistema está bloqueado
     const { data: configData, error: configError } = await supabase
       .from('configuracao_sistema')
       .select('valor')
@@ -29,7 +31,21 @@ export async function POST(request: NextRequest) {
         { status: 403 }
       );
     }
+
+    // Verificar se a loja já fez contagem
+    const { data: contagemData, count } = await supabase
+      .from('contagens')
+      .select('id', { count: 'exact' })
+      .eq('loja', userData.loja)
+      .limit(1);
     
+    if (count !== null && count > 0) {
+      return NextResponse.json(
+        { error: 'Loja já realizou contagem' },
+        { status: 409 }
+      );
+    }
+
     const loja = lojas.find(l => l.id === userData.loja);
     if (!loja) {
       return NextResponse.json(
@@ -37,8 +53,8 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-    
 
+    // Preparar registros para inserção
     const registros = ativos.map(ativo => ({
       email: userData.email,
       loja: userData.loja,
@@ -48,14 +64,32 @@ export async function POST(request: NextRequest) {
       quantidade: contagem[ativo.id] || 0
     }));
     
-
+    // Inserir contagens no banco
     const { data, error } = await supabase
       .from('contagens')
       .insert(registros)
       .select();
     
     if (error) throw error;
-    
+
+    // Enviar webhooks individuais para cada ativo
+    const contagensParaWebhook = registros.map(registro => ({
+      ativo_nome: registro.ativo_nome,
+      quantidade: registro.quantidade,
+      obs: undefined, // Pode ser expandido futuramente
+    }));
+
+    // Enviar webhooks de forma assíncrona (não bloquear a resposta)
+    sendIndividualWebhooks(
+      userData.email,
+      loja.nome,
+      'loja',
+      contagensParaWebhook
+    ).catch(error => {
+      console.error('Erro ao enviar webhooks:', error);
+      // Não falhar a operação se webhook falhar
+    });
+
     return NextResponse.json({ 
       success: true, 
       message: 'Contagem registrada com sucesso',
@@ -65,49 +99,6 @@ export async function POST(request: NextRequest) {
     console.error('Erro ao registrar contagem:', error);
     return NextResponse.json(
       { error: 'Erro ao registrar contagem' },
-      { status: 500 }
-    );
-  }
-}
-
-export async function GET(request: NextRequest) {
-  try {
-    const searchParams = request.nextUrl.searchParams;
-    const loja = searchParams.get('loja');
-    const email = searchParams.get('email');
-    const dataInicio = searchParams.get('dataInicio');
-    const dataFim = searchParams.get('dataFim');
-    
-    let query = supabase
-      .from('contagens')
-      .select('*')
-      .order('data_registro', { ascending: false });
-    
-    if (loja) {
-      query = query.eq('loja', loja);
-    }
-    
-    if (email) {
-      query = query.eq('email', email);
-    }
-    
-    if (dataInicio) {
-      query = query.gte('data_registro', dataInicio);
-    }
-    
-    if (dataFim) {
-      query = query.lte('data_registro', dataFim);
-    }
-    
-    const { data, error } = await query.limit(100);
-    
-    if (error) throw error;
-    
-    return NextResponse.json({ contagens: data });
-  } catch (error) {
-    console.error('Erro ao buscar contagens:', error);
-    return NextResponse.json(
-      { error: 'Erro ao buscar contagens' },
       { status: 500 }
     );
   }
