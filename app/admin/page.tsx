@@ -469,13 +469,6 @@ export default function Admin() {
               Sistema
             </TabsTrigger>
             <TabsTrigger 
-              value="webhook" 
-              className="data-[state=active]:bg-[#F4C95D] data-[state=active]:text-black"
-            >
-              <Webhook className="h-4 w-4 mr-2" />
-              Webhook
-            </TabsTrigger>
-            <TabsTrigger 
               value="lote" 
               className="data-[state=active]:bg-[#F4C95D] data-[state=active]:text-black"
             >
