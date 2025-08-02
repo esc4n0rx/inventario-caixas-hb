@@ -14,38 +14,60 @@ export async function POST(request: NextRequest) {
     }
 
     const now = new Date().toISOString();
-    const operations = [];
 
-    // Atualiza 'sistema_bloqueado'
-    operations.push(
-      supabase
+    // Função auxiliar para upsert seguro
+    const safeUpsert = async (chave: string, valor: string) => {
+      // Primeiro, tentar fazer update
+      const { data: updateData, error: updateError } = await supabase
         .from('configuracao_sistema')
-        .upsert({ 
-          chave: 'sistema_bloqueado',
-          valor: bloqueado ? 'true' : 'false',
+        .update({ 
+          valor,
           data_modificacao: now
-        }, { onConflict: 'chave' })
-    );
+        })
+        .eq('chave', chave)
+        .select();
 
-    // Define 'sistema_modo' para 'manual' pois esta é uma alteração manual
-    operations.push(
-      supabase
-        .from('configuracao_sistema')
-        .upsert({
-          chave: 'sistema_modo',
-          valor: 'manual',
-          data_modificacao: now
-        }, { onConflict: 'chave' })
-    );
+      if (updateError) {
+        console.error(`[API /sistema/atualizar] Erro no update para ${chave}:`, updateError);
+        throw updateError;
+      }
 
-    const results = await Promise.all(operations.map(op => op.then(res => {
-      if (res.error) throw res.error;
-      return res;
-    })));
-    
-    console.log("[API /sistema/atualizar] System status and mode updated to manual.", results);
+      // Se não atualizou nenhum registro (não existe), fazer insert
+      if (!updateData || updateData.length === 0) {
+        const { data: insertData, error: insertError } = await supabase
+          .from('configuracao_sistema')
+          .insert({ 
+            chave,
+            valor,
+            data_modificacao: now
+          })
+          .select();
 
-    return NextResponse.json({ success: true, message: 'Estado do sistema atualizado e modo definido para manual.' });
+        if (insertError) {
+          console.error(`[API /sistema/atualizar] Erro no insert para ${chave}:`, insertError);
+          throw insertError;
+        }
+
+        return insertData;
+      }
+
+      return updateData;
+    };
+
+    // Atualizar 'sistema_bloqueado'
+    await safeUpsert('sistema_bloqueado', bloqueado ? 'true' : 'false');
+    console.log(`[API /sistema/atualizar] sistema_bloqueado atualizado para: ${bloqueado ? 'true' : 'false'}`);
+
+    // Definir 'sistema_modo' para 'manual' pois esta é uma alteração manual
+    await safeUpsert('sistema_modo', 'manual');
+    console.log("[API /sistema/atualizar] sistema_modo atualizado para: manual");
+
+    console.log("[API /sistema/atualizar] System status and mode updated to manual successfully.");
+
+    return NextResponse.json({ 
+      success: true, 
+      message: 'Estado do sistema atualizado e modo definido para manual.' 
+    });
   } catch (error) {
     console.error('Erro ao atualizar estado do sistema:', error);
     return NextResponse.json(
