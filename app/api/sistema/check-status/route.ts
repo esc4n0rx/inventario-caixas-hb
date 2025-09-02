@@ -1,7 +1,9 @@
-// app/api/sistema/check-status/route.ts
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { verificarHorarioProgramado, getCurrentDateInSaoPauloTZ } from '@/lib/utils';
+
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0"
+
 
 export async function GET() {
   try {
